@@ -1,0 +1,336 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  DISABLED
+  PENDING
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  EXPIRED
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+}
+
+enum PaymentProvider {
+  STRIPE
+  WECHAT
+  ALIPAY
+  MANUAL
+}
+
+enum NovelStatus {
+  DRAFT
+  SERIALIZING
+  COMPLETED
+  ARCHIVED
+}
+
+enum ChapterStatus {
+  DRAFT
+  GENERATED
+  REVIEWED
+  PUBLISHED
+}
+
+enum GoalPeriod {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+enum AiProvider {
+  OPENAI
+  CUSTOM
+}
+
+model User {
+  id                String             @id @default(cuid())
+  email             String             @unique
+  passwordHash      String
+  nickname          String
+  role              UserRole           @default(USER)
+  status            UserStatus         @default(ACTIVE)
+  lastLoginAt       DateTime?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  refreshTokens     RefreshToken[]
+  subscriptions     Subscription[]
+  paymentOrders     PaymentOrder[]
+  aiProviderConfigs AiProviderConfig[]
+  novels            Novel[]
+  promptTemplates   PromptTemplate[]
+  genrePresets      GenrePreset[]
+  writingGoals      WritingGoal[]
+  tokenUsages       TokenUsage[]
+  userSettings      UserSetting?
+}
+
+model RefreshToken {
+  id         String   @id @default(cuid())
+  userId     String
+  tokenHash  String   @unique
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model SubscriptionPlan {
+  id                String         @id @default(cuid())
+  code              String         @unique
+  name              String
+  description       String?
+  priceMonthly      Decimal        @db.Decimal(10, 2)
+  tokenQuotaMonthly Int
+  maxNovels         Int?
+  features          Json?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  subscriptions     Subscription[]
+}
+
+model Subscription {
+  id                  String             @id @default(cuid())
+  userId              String
+  planId              String
+  status              SubscriptionStatus @default(TRIALING)
+  startedAt           DateTime           @default(now())
+  currentPeriodStart  DateTime           @default(now())
+  currentPeriodEnd    DateTime
+  cancelAtPeriodEnd   Boolean            @default(false)
+  endedAt             DateTime?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  user                User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan                SubscriptionPlan   @relation(fields: [planId], references: [id])
+  paymentOrders       PaymentOrder[]
+
+  @@index([userId, status])
+}
+
+model PaymentOrder {
+  id              String          @id @default(cuid())
+  userId          String
+  subscriptionId  String?
+  provider        PaymentProvider
+  providerOrderId String?         @unique
+  amount          Decimal         @db.Decimal(10, 2)
+  currency        String          @default("CNY")
+  status          PaymentStatus   @default(PENDING)
+  metadata        Json?
+  paidAt          DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subscription    Subscription?   @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+
+  @@index([userId, status])
+}
+
+model AiProviderConfig {
+  id          String     @id @default(cuid())
+  userId      String
+  provider    AiProvider @default(OPENAI)
+  name        String
+  baseUrl     String?
+  apiKey      String?
+  model       String?
+  isDefault   Boolean    @default(false)
+  isEnabled   Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isDefault])
+}
+
+model Novel {
+  id             String         @id @default(cuid())
+  userId         String
+  title          String
+  cover          String?
+  intro          String?        @db.Text
+  genre          String?
+  theme          String?
+  tags           Json?
+  wordCount      Int            @default(0)
+  status         NovelStatus    @default(DRAFT)
+  metadata       Json?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chapters       Chapter[]
+  characters     Character[]
+  worldSettings  WorldSetting[]
+  storyEvents    StoryEvent[]
+  tokenUsages    TokenUsage[]
+
+  @@index([userId, updatedAt])
+}
+
+model Chapter {
+  id             String        @id @default(cuid())
+  novelId        String
+  title          String
+  sortOrder      Int
+  content        String?       @db.Text
+  outlineContent String?       @db.Text
+  generatedText  String?       @db.Text
+  summary        String?       @db.Text
+  wordCount      Int           @default(0)
+  status         ChapterStatus @default(DRAFT)
+  metadata       Json?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  novel          Novel         @relation(fields: [novelId], references: [id], onDelete: Cascade)
+  tokenUsages    TokenUsage[]
+
+  @@index([novelId, sortOrder])
+}
+
+model Character {
+  id          String   @id @default(cuid())
+  novelId     String
+  name        String
+  role        String?
+  description String?  @db.Text
+  traits      Json?
+  profile     Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  novel       Novel    @relation(fields: [novelId], references: [id], onDelete: Cascade)
+
+  @@index([novelId])
+}
+
+model WorldSetting {
+  id          String   @id @default(cuid())
+  novelId     String
+  title       String
+  category    String?
+  description String?  @db.Text
+  details     Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  novel       Novel    @relation(fields: [novelId], references: [id], onDelete: Cascade)
+
+  @@index([novelId])
+}
+
+model StoryEvent {
+  id          String   @id @default(cuid())
+  novelId     String
+  title       String
+  timePoint   String?
+  description String?  @db.Text
+  sortOrder   Int      @default(0)
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  novel       Novel    @relation(fields: [novelId], references: [id], onDelete: Cascade)
+
+  @@index([novelId, sortOrder])
+}
+
+model PromptTemplate {
+  id          String   @id @default(cuid())
+  userId      String
+  title       String
+  category    String?
+  content     String   @db.Text
+  variables   Json?
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, category])
+}
+
+model GenrePreset {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  description String?  @db.Text
+  tags        Json?
+  settings    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, name])
+}
+
+model WritingGoal {
+  id           String     @id @default(cuid())
+  userId       String
+  title        String
+  period       GoalPeriod
+  targetWords  Int
+  currentWords Int        @default(0)
+  startDate    DateTime
+  endDate      DateTime
+  status       String     @default("ACTIVE")
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, period, status])
+}
+
+model UserSetting {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  data      Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model TokenUsage {
+  id               String    @id @default(cuid())
+  userId           String
+  novelId          String?
+  chapterId        String?
+  provider         AiProvider @default(OPENAI)
+  model            String
+  operationType    String
+  promptTokens     Int       @default(0)
+  completionTokens Int       @default(0)
+  totalTokens      Int       @default(0)
+  estimatedCost    Decimal?  @db.Decimal(10, 4)
+  requestPayload   Json?
+  responsePayload  Json?
+  createdAt        DateTime  @default(now())
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  novel            Novel?    @relation(fields: [novelId], references: [id], onDelete: SetNull)
+  chapter          Chapter?  @relation(fields: [chapterId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([novelId])
+  @@index([chapterId])
+}

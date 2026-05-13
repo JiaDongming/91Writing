@@ -1,2 +1,6 @@
 node_modules/
 .history/
+dist/
+server/node_modules/
+server/dist/
+server/.env

@@ -5,6 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "server:dev": "npm --prefix server run dev",
+    "server:build": "npm --prefix server run build",
+    "server:prisma:generate": "npm --prefix server run prisma:generate",
+    "server:prisma:push": "npm --prefix server run prisma:push",
+    "server:prisma:seed": "npm --prefix server run prisma:seed",
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix --ignore-path .gitignore"
