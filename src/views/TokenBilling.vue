@@ -350,42 +350,36 @@ const showDetailsDialog = ref(false)
 const selectedRecord = ref(null)
 
 // Token统计数据
-const todayStats = computed(() => {
-  return billingService.getTodayStats()
-})
-
-const todayTokens = computed(() => {
-  return todayStats.value.tokenCount
-})
-
-const usageStats = computed(() => {
-  return billingService.getUsageStats()
-})
-
-const totalInputTokens = computed(() => {
-  return usageStats.value.totalInputTokens
-})
-
-const totalOutputTokens = computed(() => {
-  return usageStats.value.totalOutputTokens
-})
-
-const totalTokens = computed(() => {
-  return totalInputTokens.value + totalOutputTokens.value
-})
+const todayTokens = ref(0)
+const todayCost = ref(0)
+const totalInputTokens = ref(0)
+const totalOutputTokens = ref(0)
+const totalTokens = ref(0)
 
 // 使用记录数据
 const billingRecords = ref([])
 
-// 加载计费记录
-const loadBillingRecords = () => {
+// 加载所有统计数据
+const loadStats = async () => {
   try {
-    billingRecords.value = billingService.getBillingRecords()
-    
-    // 如果没有数据，可选择是否添加示例数据
-    if (billingRecords.value.length === 0) {
-      console.log('暂无使用记录')
-    }
+    const [todayStats, usageStats] = await Promise.all([
+      billingService.getTodayStats(),
+      billingService.getUsageStats()
+    ])
+    todayTokens.value = todayStats.tokenCount
+    todayCost.value = todayStats.cost
+    totalInputTokens.value = usageStats.totalInputTokens
+    totalOutputTokens.value = usageStats.totalOutputTokens
+    totalTokens.value = totalInputTokens.value + totalOutputTokens.value
+  } catch (error) {
+    console.error('加载统计数据失败:', error)
+  }
+}
+
+// 加载计费记录
+const loadBillingRecords = async () => {
+  try {
+    billingRecords.value = await billingService.getBillingRecords()
   } catch (error) {
     console.error('加载使用记录失败:', error)
     billingRecords.value = []
@@ -484,21 +478,21 @@ const getStatusText = (status) => {
   return texts[status] || '未知'
 }
 
-const exportBilling = () => {
+const exportBilling = async () => {
   try {
-    const data = billingService.exportBillingData('csv')
+    const data = await billingService.exportBillingData('csv')
     const blob = new Blob([data], { type: 'text/csv;charset=utf-8;' })
     const link = document.createElement('a')
-    
+
     const url = URL.createObjectURL(blob)
     link.setAttribute('href', url)
     link.setAttribute('download', `token_usage_${new Date().toISOString().slice(0, 10)}.csv`)
     link.style.visibility = 'hidden'
-    
+
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
-    
+
     ElMessage.success('使用统计导出成功！')
   } catch (error) {
     console.error('导出失败:', error)
@@ -528,9 +522,8 @@ const copyContent = async (content) => {
 }
 
 // 生命周期
-onMounted(() => {
-  // 加载使用记录
-  loadBillingRecords()
+onMounted(async () => {
+  await Promise.all([loadStats(), loadBillingRecords()])
 })
 </script>
 

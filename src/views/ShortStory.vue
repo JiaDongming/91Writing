@@ -835,6 +835,8 @@
 </template>
 
 <script setup>
+import { getItem, setItem, removeItem } from '@/services/storageCompat'
+import { listPrompts, createPrompt as apiCreatePrompt } from '@/services/workspaceApi'
 import { ref, reactive, computed, shallowRef, onMounted, onUnmounted, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick, Refresh, EditPen, Download, Check, Loading, Plus, Setting, List, DocumentCopy, Switch, Delete, Search, InfoFilled } from '@element-plus/icons-vue'
@@ -916,18 +918,17 @@ const articleWordCount = computed(() => {
 })
 
 const filteredArticlePrompts = computed(() => {
-  const allPrompts = JSON.parse(localStorage.getItem('prompts') || '[]')
-  const articlePrompts = allPrompts.filter(p => p.category === 'short-story')
-  
+  const articlePrompts = availablePrompts.value.filter(p => p.category === 'short-story')
+
   if (!articlePromptSearchKeyword.value) {
     return articlePrompts
   }
-  
+
   const keyword = articlePromptSearchKeyword.value.toLowerCase()
-  return articlePrompts.filter(prompt => 
+  return articlePrompts.filter(prompt =>
     prompt.title.toLowerCase().includes(keyword) ||
-    prompt.description.toLowerCase().includes(keyword) ||
-    prompt.tags.some(tag => tag.toLowerCase().includes(keyword))
+    (prompt.description || '').toLowerCase().includes(keyword) ||
+    (prompt.tags || []).some(tag => tag.toLowerCase().includes(keyword))
   )
 })
 
@@ -937,8 +938,7 @@ const storyPromptSearchKeyword = ref('')
 
 // 计算属性 - 短篇小说提示词
 const filteredStoryPrompts = computed(() => {
-  const allPrompts = JSON.parse(localStorage.getItem('prompts') || '[]')
-  const storyPrompts = allPrompts.filter(p => p.category === 'short-story')
+  const storyPrompts = availablePrompts.value.filter(p => p.category === 'short-story')
   
   if (!storyPromptSearchKeyword.value) {
     return storyPrompts
@@ -1815,7 +1815,7 @@ const getTextWordCount = (html) => {
 // 配置管理方法
 const loadConfigData = () => {
   try {
-    const savedConfig = localStorage.getItem('shortStoryConfig')
+    const savedConfig = getItem('shortStoryConfig')
     if (savedConfig) {
       const config = JSON.parse(savedConfig)
       Object.keys(defaultConfigData).forEach(key => {
@@ -1860,7 +1860,7 @@ const loadConfigData = () => {
 
 const saveConfigData = () => {
   try {
-    localStorage.setItem('shortStoryConfig', JSON.stringify(configData))
+    setItem('shortStoryConfig', JSON.stringify(configData))
     ElMessage.success('配置保存成功！')
     showConfigManager.value = false
   } catch (error) {
@@ -1896,7 +1896,7 @@ const removeWritingStyle = (index) => {
 
 const saveWritingStyleConfig = () => {
   try {
-    localStorage.setItem('shortStoryConfig', JSON.stringify(configData))
+    setItem('shortStoryConfig', JSON.stringify(configData))
     ElMessage.success('文风配置保存成功！')
     showWritingStyleManager.value = false
   } catch (error) {
@@ -1940,31 +1940,44 @@ const resetToDefault = () => {
 }
 
 // 提示词管理方法
-const loadPrompts = () => {
+const loadPrompts = async () => {
   try {
-    const savedPrompts = localStorage.getItem('prompts')
-    if (savedPrompts) {
-      const prompts = JSON.parse(savedPrompts)
-      // 检查是否有短篇小说分类的提示词，如果没有则添加默认的
-      const hasShortStoryPrompts = prompts.some(p => p.category === 'short-story')
-      if (!hasShortStoryPrompts) {
-        const defaultShortStoryPrompts = getDefaultShortStoryPrompts()
-        prompts.push(...defaultShortStoryPrompts)
-        // 保存更新后的提示词
-        localStorage.setItem('prompts', JSON.stringify(prompts))
-        console.log('已添加默认短篇小说提示词')
+    const backendPrompts = await listPrompts()
+    const mapped = backendPrompts.map(p => ({
+      id: p.id,
+      title: p.title,
+      category: p.category,
+      content: p.content,
+      description: p.variables?.description || '',
+      tags: p.variables?.tags || [],
+      isDefault: p.isSystem || false
+    }))
+    const hasShortStoryPrompts = mapped.some(p => p.category === 'short-story')
+    if (!hasShortStoryPrompts) {
+      const defaultShortStoryPrompts = getDefaultShortStoryPrompts()
+      for (const dp of defaultShortStoryPrompts) {
+        try {
+          const created = await apiCreatePrompt({
+            title: dp.title,
+            category: 'short-story',
+            content: dp.content,
+            variables: { description: dp.description, tags: dp.tags }
+          })
+          mapped.push({
+            id: created.id,
+            title: created.title,
+            category: created.category,
+            content: created.content,
+            description: created.variables?.description || '',
+            tags: created.variables?.tags || [],
+            isDefault: true
+          })
+        } catch { /* skip if creation fails */ }
       }
-      availablePrompts.value = prompts
-    } else {
-      // 如果没有任何提示词，加载默认的
-      const defaultPrompts = getDefaultShortStoryPrompts()
-      availablePrompts.value = defaultPrompts
-      localStorage.setItem('prompts', JSON.stringify(defaultPrompts))
     }
-    console.log('短篇小说模块加载提示词数据:', availablePrompts.value.length)
+    availablePrompts.value = mapped
   } catch (error) {
     console.error('加载提示词失败:', error)
-    // 出错时也提供默认的短篇小说提示词
     availablePrompts.value = getDefaultShortStoryPrompts()
   }
 }
@@ -2182,9 +2195,9 @@ const stopGeneration = () => {
 }
 
 // 页面初始化时加载配置
-onMounted(() => {
+onMounted(async () => {
   loadConfigData()
-  loadPrompts()
+  await loadPrompts()
 })
 
 // 组件卸载时销毁编辑器

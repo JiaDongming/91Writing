@@ -177,6 +177,7 @@
 </template>
 
 <script setup>
+import { listGenres, createGenre, updateGenre, deleteGenre as apiDeleteGenre } from '@/services/workspaceApi'
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { 
@@ -301,37 +302,33 @@ const loadDefaultGenres = () => {
 }
 
 // 加载类型数据
-const loadGenres = () => {
+const loadGenres = async () => {
   try {
-    const saved = localStorage.getItem('novelGenres')
-    if (saved) {
-      const parsed = JSON.parse(saved)
-      // 确保包含默认类型
-      const defaultGenres = loadDefaultGenres()
-      const savedCodes = parsed.map(g => g.code)
-      const missingDefaults = defaultGenres.filter(g => !savedCodes.includes(g.code))
-      genres.value = [...parsed, ...missingDefaults]
-    } else {
-      // 首次加载，使用默认类型
-      genres.value = loadDefaultGenres()
-      saveGenres()
-    }
+    const backendGenres = await listGenres()
+    const mapped = backendGenres.map(item => ({
+      id: item.id,
+      code: item.settings?.code || item.name,
+      name: item.name,
+      prompt: item.description || '',
+      tags: item.tags || [],
+      examples: item.settings?.examples || '',
+      isDefault: item.settings?.isDefault || false,
+      createdAt: item.createdAt,
+      usageCount: item.settings?.usageCount || 0
+    }))
+
+    const defaultGenres = loadDefaultGenres()
+    const mappedCodes = mapped.map(g => g.code)
+    const missingDefaults = defaultGenres.filter(g => !mappedCodes.includes(g.code))
+    genres.value = [...mapped, ...missingDefaults]
   } catch (error) {
     console.error('加载类型数据失败:', error)
     genres.value = loadDefaultGenres()
   }
 }
 
-// 保存类型数据
-const saveGenres = () => {
-  try {
-    localStorage.setItem('novelGenres', JSON.stringify(genres.value))
-    console.log('类型数据已保存:', genres.value)
-  } catch (error) {
-    console.error('保存类型数据失败:', error)
-    ElMessage.error('保存数据失败')
-  }
-}
+// 保存类型数据（数据已通过 API 逐条保存，此方法保留为空以兼容调用处）
+const saveGenres = () => {}
 
 // 编辑类型
 const editGenre = (genre) => {
@@ -377,20 +374,22 @@ const deleteGenre = async (genre) => {
     ElMessage.warning('系统预设类型不能删除')
     return
   }
-  
+
   try {
     await ElMessageBox.confirm(
       `确定要删除类型"${genre.name}"吗？此操作不可恢复。`,
       '确认删除',
       { type: 'warning' }
     )
-    
+
+    if (genre.id) {
+      await apiDeleteGenre(genre.id)
+    }
     const index = genres.value.findIndex(g => g.code === genre.code)
     if (index > -1) {
       genres.value.splice(index, 1)
-      saveGenres()
-      ElMessage.success('类型删除成功')
     }
+    ElMessage.success('类型删除成功')
   } catch (error) {
     // 用户取消删除
   }
@@ -415,34 +414,33 @@ const saveGenre = async () => {
   try {
     await formRef.value.validate()
     isSaving.value = true
-    
-    const genreData = {
-      ...genreForm.value,
+
+    const payload = {
+      name: genreForm.value.name,
+      description: genreForm.value.prompt,
       tags: genreForm.value.tags.filter(tag => tag.trim()),
-      createdAt: editingGenre.value?.createdAt || new Date(),
-      updatedAt: new Date(),
-      usageCount: editingGenre.value?.usageCount || 0,
-      isDefault: editingGenre.value?.isDefault || false
-    }
-    
-    if (editingGenre.value) {
-      // 编辑现有类型
-      const index = genres.value.findIndex(g => g.code === editingGenre.value.code)
-      if (index > -1) {
-        genres.value[index] = genreData
+      settings: {
+        code: genreForm.value.code,
+        examples: genreForm.value.examples,
+        isDefault: editingGenre.value?.isDefault || false,
+        usageCount: editingGenre.value?.usageCount || 0
       }
+    }
+
+    if (editingGenre.value?.id) {
+      await updateGenre(editingGenre.value.id, payload)
       ElMessage.success('类型更新成功')
     } else {
-      // 创建新类型
-      genres.value.push(genreData)
+      await createGenre(payload)
       ElMessage.success('类型创建成功')
     }
-    
-    saveGenres()
+
+    await loadGenres()
     showCreateDialog.value = false
     resetForm()
   } catch (error) {
     console.error('保存类型失败:', error)
+    ElMessage.error('保存类型失败')
   } finally {
     isSaving.value = false
   }
@@ -468,8 +466,8 @@ const formatDate = (date) => {
 }
 
 // 生命周期
-onMounted(() => {
-  loadGenres()
+onMounted(async () => {
+  await loadGenres()
 })
 </script>
 

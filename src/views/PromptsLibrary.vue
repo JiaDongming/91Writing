@@ -310,10 +310,11 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { 
-  Plus, Search, MoreFilled, Edit, CopyDocument, 
+import {
+  Plus, Search, MoreFilled, Edit, CopyDocument,
   Delete, Upload, UploadFilled
 } from '@element-plus/icons-vue'
+import { listPrompts, createPrompt, updatePrompt, deletePrompt as apiDeletePrompt } from '@/services/workspaceApi'
 
 // 响应式数据
 const activeCategory = ref('all')
@@ -433,15 +434,11 @@ const deletePrompt = async (prompt) => {
     await ElMessageBox.confirm('确定要删除这个提示词吗？', '确认删除', {
       type: 'warning'
     })
-    
-    const index = prompts.value.findIndex(p => p.id === prompt.id)
-    if (index > -1) {
-      prompts.value.splice(index, 1)
-      savePrompts()
-      ElMessage.success('删除成功')
-    }
+    await apiDeletePrompt(prompt.id)
+    await loadPrompts()
+    ElMessage.success('删除成功')
   } catch (error) {
-    // 用户取消删除
+    if (error !== 'cancel') console.error('删除失败:', error)
   }
 }
 
@@ -524,29 +521,32 @@ const removeTag = (index) => {
 const savePrompt = async () => {
   try {
     await formRef.value.validate()
-    
-    if (editingPrompt.value) {
-      // 编辑模式
-      const index = prompts.value.findIndex(p => p.id === editingPrompt.value.id)
-      if (index > -1) {
-        prompts.value[index] = { ...promptForm.value, id: editingPrompt.value.id }
+
+    const apiData = {
+      title: promptForm.value.title,
+      category: promptForm.value.category,
+      content: promptForm.value.content,
+      variables: {
+        description: promptForm.value.description,
+        tags: promptForm.value.tags
       }
+    }
+
+    if (editingPrompt.value) {
+      await updatePrompt(editingPrompt.value.id, apiData)
       ElMessage.success('提示词更新成功')
     } else {
-      // 新增模式
-      const newPrompt = {
-        ...promptForm.value,
-        id: Date.now()
-      }
-      prompts.value.push(newPrompt)
+      await createPrompt(apiData)
       ElMessage.success('提示词添加成功')
     }
-    
+
     showAddDialog.value = false
     resetForm()
-    savePrompts()
+    await loadPrompts()
   } catch (error) {
-    // 验证失败
+    if (error.response) {
+      ElMessage.error('保存失败：' + (error.response.data?.message || error.message))
+    }
   }
 }
 
@@ -677,25 +677,29 @@ const validatePromptItem = (item, index) => {
   return { valid: true, prompt }
 }
 
-const confirmImport = () => {
+const confirmImport = async () => {
   if (previewPrompts.value.length === 0) {
     ElMessage.warning('没有可导入的提示词')
     return
   }
-  
-  // 重新生成ID避免冲突
-  const newPrompts = previewPrompts.value.map(prompt => ({
-    ...prompt,
-    id: Date.now() + Math.random()
-  }))
-  
-  // 添加到现有提示词列表
-  prompts.value.push(...newPrompts)
-  
-  // 保存到本地存储
-  savePrompts()
-  
-  ElMessage.success(`成功导入 ${newPrompts.length} 个提示词`)
+
+  try {
+    for (const prompt of previewPrompts.value) {
+      await createPrompt({
+        title: prompt.title,
+        category: prompt.category,
+        content: prompt.content,
+        variables: {
+          description: prompt.description,
+          tags: prompt.tags
+        }
+      })
+    }
+    ElMessage.success(`成功导入 ${previewPrompts.value.length} 个提示词`)
+    await loadPrompts()
+  } catch (error) {
+    ElMessage.error('导入失败：' + (error.response?.data?.message || error.message))
+  }
   
   // 重置导入状态
   cancelImport()
@@ -709,26 +713,31 @@ const cancelImport = () => {
 }
 
 // 生命周期
-onMounted(() => {
+onMounted(async () => {
   // 加载提示词数据
-  loadPrompts()
+  await loadPrompts()
 })
 
 // 加载提示词数据
-const loadPrompts = () => {
-  const savedPrompts = localStorage.getItem('prompts')
-  if (savedPrompts) {
-    try {
-      const parsed = JSON.parse(savedPrompts)
-      prompts.value = parsed
-    } catch (error) {
-      console.error('加载提示词失败:', error)
-      prompts.value = getDefaultPrompts()
-      savePrompts()
+const loadPrompts = async () => {
+  try {
+    const data = await listPrompts()
+    if (data.length > 0) {
+      prompts.value = data.map(p => ({
+        id: p.id,
+        title: p.title,
+        category: p.category || 'content',
+        description: p.variables?.description || '',
+        content: p.content,
+        tags: p.variables?.tags || [],
+        isDefault: p.isSystem || false
+      }))
+    } else {
+      prompts.value = []
     }
-  } else {
-    prompts.value = getDefaultPrompts()
-    savePrompts()
+  } catch (error) {
+    console.error('加载提示词失败:', error)
+    prompts.value = []
   }
 }
 
@@ -1327,13 +1336,9 @@ const getDefaultPrompts = () => {
   ]
 }
 
-// 保存提示词数据
+// 保存提示词数据（已迁移到后端 API，此方法保留兼容）
 const savePrompts = () => {
-  try {
-    localStorage.setItem('prompts', JSON.stringify(prompts.value))
-  } catch (error) {
-    console.error('保存提示词失败:', error)
-  }
+  // 数据已通过 API 实时保存，无需写 localStorage
 }
 </script>
 

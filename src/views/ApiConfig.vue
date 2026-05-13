@@ -431,10 +431,11 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { 
+import {
   Connection, Check, CircleCheck, Warning, Star, Plus,
   Delete, Download, Upload, RefreshLeft
 } from '@element-plus/icons-vue'
+import { listProviders, createProvider, updateProvider, deleteProvider } from '@/services/workspaceApi'
 
 // 响应式数据
 const activeTab = ref('1')
@@ -605,6 +606,7 @@ const addNewConfig = () => {
     status: 'disconnected'
   }
   
+  newConfig._isNew = true
   apiConfigs.value.push(newConfig)
   activeTab.value = newId
   ElMessage.success('已添加新配置')
@@ -667,17 +669,43 @@ const saveConfig = (config) => {
   ElMessage.success(`${config.name} 配置已保存`)
 }
 
-const saveAllConfigs = () => {
-  const validConfigs = apiConfigs.value.filter(config => config.name && config.apiUrl)
-  
+const saveAllConfigs = async () => {
+  const validConfigs = apiConfigs.value.filter(config => config.name)
+
   if (validConfigs.length === 0) {
     ElMessage.warning('没有有效的配置可保存')
     return
   }
-  
-  // 保存到本地存储
-  localStorage.setItem('aiApiConfigs', JSON.stringify(apiConfigs.value))
-  ElMessage.success(`已保存 ${validConfigs.length} 个配置`)
+
+  try {
+    for (const config of validConfigs) {
+      if (config._isNew) {
+        await createProvider({
+          provider: config.type === 'openai' ? 'OPENAI' : 'CUSTOM',
+          name: config.name,
+          baseUrl: config.apiUrl || null,
+          apiKey: config.apiKey || null,
+          model: config.model || null,
+          isDefault: config.isDefault || false,
+          isEnabled: config.enabled !== false
+        })
+        config._isNew = false
+      } else {
+        await updateProvider(config.id, {
+          provider: config.type === 'openai' ? 'OPENAI' : 'CUSTOM',
+          name: config.name,
+          baseUrl: config.apiUrl || null,
+          apiKey: config.apiKey || null,
+          model: config.model || null,
+          isDefault: config.isDefault || false,
+          isEnabled: config.enabled !== false
+        })
+      }
+    }
+    ElMessage.success(`已保存 ${validConfigs.length} 个配置`)
+  } catch (error) {
+    ElMessage.error('保存失败：' + (error.response?.data?.message || error.message))
+  }
 }
 
 const resetConfig = (config) => {
@@ -734,30 +762,32 @@ const duplicateConfig = (config) => {
 
 const deleteConfig = (configId) => {
   const config = apiConfigs.value.find(c => c.id === configId)
-  
+
   if (config.isDefault) {
     ElMessage.warning('不能删除默认配置')
     return
   }
-  
+
   ElMessageBox.confirm(
     `确定要删除配置 "${config.name}" 吗？此操作不可恢复。`,
     '删除配置',
-    {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'warning'
+    { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' }
+  ).then(async () => {
+    try {
+      if (!config._isNew) {
+        await deleteProvider(configId)
+      }
+      const index = apiConfigs.value.findIndex(c => c.id === configId)
+      apiConfigs.value.splice(index, 1)
+
+      if (activeTab.value === configId && apiConfigs.value.length > 0) {
+        activeTab.value = apiConfigs.value[0].id
+      }
+
+      ElMessage.success('配置已删除')
+    } catch (error) {
+      ElMessage.error('删除失败：' + (error.response?.data?.message || error.message))
     }
-  ).then(() => {
-    const index = apiConfigs.value.findIndex(c => c.id === configId)
-    apiConfigs.value.splice(index, 1)
-    
-    // 如果删除的是当前激活的标签，切换到第一个
-    if (activeTab.value === configId && apiConfigs.value.length > 0) {
-      activeTab.value = apiConfigs.value[0].id
-    }
-    
-    ElMessage.success('配置已删除')
   })
 }
 
@@ -899,23 +929,37 @@ const resetAllConfigs = () => {
 }
 
 // 生命周期
-onMounted(() => {
-  // 从本地存储加载配置
-  const savedConfigs = localStorage.getItem('aiApiConfigs')
-  if (savedConfigs) {
-    try {
-      const configs = JSON.parse(savedConfigs)
-      // 为现有配置添加unlimitedTokens字段
-      apiConfigs.value = configs.map(config => ({
-        ...config,
-        unlimitedTokens: config.unlimitedTokens !== undefined ? config.unlimitedTokens : (config.maxTokens === null)
+onMounted(async () => {
+  try {
+    const providers = await listProviders()
+    if (providers.length > 0) {
+      apiConfigs.value = providers.map(p => ({
+        id: p.id,
+        name: p.name,
+        type: p.provider === 'OPENAI' ? 'openai' : 'custom',
+        description: '',
+        apiUrl: p.baseUrl || '',
+        apiKey: p.apiKey || '',
+        model: p.model || '',
+        temperature: 0.7,
+        maxTokens: null,
+        unlimitedTokens: true,
+        topP: 1.0,
+        frequencyPenalty: 0.0,
+        presencePenalty: 0.0,
+        timeout: 30,
+        isDefault: p.isDefault || false,
+        enabled: p.isEnabled !== false,
+        streamMode: true,
+        retryCount: 3,
+        priority: 1,
+        customHeaders: '',
+        status: 'connected'
       }))
-      if (apiConfigs.value.length > 0) {
-        activeTab.value = apiConfigs.value[0].id
-      }
-    } catch (error) {
-      console.error('加载配置失败:', error)
+      activeTab.value = apiConfigs.value[0].id
     }
+  } catch (error) {
+    console.error('加载配置失败:', error)
   }
 })
 </script>

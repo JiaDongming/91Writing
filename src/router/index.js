@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory, createWebHashHistory } from 'vue-router'
+import { createRouter, createWebHashHistory } from 'vue-router'
 import Dashboard from '../views/Dashboard.vue'
 import HomePage from '../views/HomePage.vue'
 import PromptsLibrary from '../views/PromptsLibrary.vue'
@@ -9,16 +9,23 @@ import ApiConfig from '../views/ApiConfig.vue'
 import Settings from '../views/Settings.vue'
 import ChapterManagement from '../views/ChapterManagement.vue'
 import Writer from '../views/Writer.vue'
-import Home from '../views/Home.vue'
 import GenreManagement from '../views/GenreManagement.vue'
 import ToolsLibrary from '../views/ToolsLibrary.vue'
 import ShortStory from '../views/ShortStory.vue'
 import BookAnalysis from '../views/BookAnalysis.vue'
+import Login from '../views/Login.vue'
 
 const routes = [
   {
+    path: '/login',
+    name: 'Login',
+    component: Login,
+    meta: { noAuth: true }
+  },
+  {
     path: '/',
     component: Dashboard,
+    meta: { requiresAuth: true },
     children: [
       {
         path: '',
@@ -87,11 +94,30 @@ const routes = [
       }
     ]
   }
-  ]
+]
 
 const router = createRouter({
   history: createWebHashHistory(),
   routes
+})
+
+// 导航守卫 —— 未登录跳转登录页
+router.beforeEach(async (to, from, next) => {
+  const token = localStorage.getItem('accessToken')
+
+  if (to.meta.noAuth) {
+    // 已登录用户访问登录页，跳转首页
+    if (token) {
+      return next('/')
+    }
+    return next()
+  }
+
+  if (to.meta.requiresAuth && !token) {
+    return next({ path: '/login', query: { redirect: to.fullPath } })
+  }
+
+  next()
 })
 
 export default router

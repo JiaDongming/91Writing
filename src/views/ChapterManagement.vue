@@ -278,6 +278,7 @@ import {
   CopyDocument, ArrowUp, ArrowDown, Delete 
 } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
+import { listNovels, getNovel, createChapter, updateChapter, deleteChapter as apiDeleteChapter } from '@/services/novelApi'
 
 const router = useRouter()
 
@@ -323,35 +324,33 @@ const selectedNovel = computed(() => {
 })
 
 // 方法
-const loadNovels = () => {
+const loadNovels = async () => {
   try {
-    const saved = localStorage.getItem('novels')
-    if (saved) {
-      const parsedNovels = JSON.parse(saved)
-      novels.value = parsedNovels.map(novel => ({
-        ...novel,
-        createdAt: new Date(novel.createdAt),
-        updatedAt: new Date(novel.updatedAt)
-      }))
-    }
+    const data = await listNovels()
+    novels.value = data.map(novel => ({
+      ...novel,
+      createdAt: new Date(novel.createdAt),
+      updatedAt: new Date(novel.updatedAt),
+      chapters: novel._count?.chapters || 0
+    }))
   } catch (error) {
     console.error('加载小说数据失败:', error)
     novels.value = []
   }
 }
 
-const formatNumber = (num) => {
+const formatNumber = async (num) => {
   if (num >= 10000) {
     return (num / 10000).toFixed(1) + '万'
   }
   return num.toLocaleString()
 }
 
-const formatDate = (date) => {
+const formatDate = async (date) => {
   return new Date(date).toLocaleDateString('zh-CN')
 }
 
-const getChapterStatusType = (status) => {
+const getChapterStatusType = async (status) => {
   const typeMap = {
     draft: '',
     writing: 'warning',
@@ -361,7 +360,7 @@ const getChapterStatusType = (status) => {
   return typeMap[status] || ''
 }
 
-const getChapterStatusText = (status) => {
+const getChapterStatusText = async (status) => {
   const textMap = {
     draft: '草稿',
     writing: '写作中',
@@ -371,44 +370,41 @@ const getChapterStatusText = (status) => {
   return textMap[status] || '未知'
 }
 
-const handleNovelChange = (novelId) => {
+const handleNovelChange = async (novelId) => {
   loadChapters(novelId)
 }
 
-const loadChapters = (novelId) => {
-  const novel = novels.value.find(n => n.id === novelId)
-  if (novel && novel.chapterList) {
-    chapters.value = novel.chapterList.map(chapter => ({
-      ...chapter,
-      createdAt: new Date(chapter.createdAt),
-      updatedAt: new Date(chapter.updatedAt)
-    }))
-  } else {
+const loadChapters = async (novelId) => {
+  try {
+    const novel = await getNovel(novelId)
+    if (novel && novel.chapters) {
+      chapters.value = novel.chapters.map(chapter => ({
+        ...chapter,
+        createdAt: new Date(chapter.createdAt),
+        updatedAt: new Date(chapter.updatedAt)
+      }))
+    } else {
+      chapters.value = []
+    }
+  } catch (error) {
+    console.error('加载章节失败:', error)
     chapters.value = []
   }
 }
 
-const saveChaptersToNovel = () => {
+const saveChaptersToNovel = async () => {
   if (!selectedNovelId.value) return
   
   try {
-    const novels = JSON.parse(localStorage.getItem('novels') || '[]')
-    const novelIndex = novels.findIndex(n => n.id === selectedNovelId.value)
-    
-    if (novelIndex > -1) {
-      // 更新章节列表
-      novels[novelIndex].chapterList = chapters.value
-      // 重新计算总字数
-      novels[novelIndex].wordCount = chapters.value.reduce((sum, ch) => sum + (ch.wordCount || 0), 0)
-      // 更新章节数（兼容性）
-      novels[novelIndex].chapters = chapters.value.length
-      // 更新修改时间
-      novels[novelIndex].updatedAt = new Date()
-      
-      localStorage.setItem('novels', JSON.stringify(novels))
-      
-      // 同步更新本地的novels数据
-      loadNovels()
+    // 重新加载小说数据以更新统计
+    await loadNovels()
+    const novel = await getNovel(selectedNovelId.value)
+    if (novel) {
+      chapters.value = (novel.chapters || []).map(ch => ({
+        ...ch,
+        createdAt: new Date(ch.createdAt),
+        updatedAt: new Date(ch.updatedAt)
+      }))
     }
   } catch (error) {
     console.error('保存章节数据失败:', error)
@@ -416,17 +412,17 @@ const saveChaptersToNovel = () => {
   }
 }
 
-const editChapter = (chapter) => {
+const editChapter = async (chapter) => {
   // 跳转到Writer页面进行编辑
   router.push(`/writer?novelId=${selectedNovelId.value}&chapterId=${chapter.id}`)
 }
 
-const viewChapter = (chapter) => {
+const viewChapter = async (chapter) => {
   previewChapter.value = chapter
   showPreviewDialog.value = true
 }
 
-const duplicateChapter = (chapter) => {
+const duplicateChapter = async (chapter) => {
   const newChapter = {
     ...chapter,
     id: Date.now(),
@@ -437,26 +433,26 @@ const duplicateChapter = (chapter) => {
   }
   chapters.value.push(newChapter)
   // 保存到localStorage
-  saveChaptersToNovel()
+  await saveChaptersToNovel()
   ElMessage.success('章节复制成功')
 }
 
-const moveChapter = (chapter, direction) => {
+const moveChapter = async (chapter, direction) => {
   const index = chapters.value.findIndex(c => c.id === chapter.id)
   if (direction === 'up' && index > 0) {
     [chapters.value[index], chapters.value[index - 1]] = [chapters.value[index - 1], chapters.value[index]]
     // 保存到localStorage
-    saveChaptersToNovel()
+    await saveChaptersToNovel()
     ElMessage.success('章节上移成功')
   } else if (direction === 'down' && index < chapters.value.length - 1) {
     [chapters.value[index], chapters.value[index + 1]] = [chapters.value[index + 1], chapters.value[index]]
     // 保存到localStorage
-    saveChaptersToNovel()
+    await saveChaptersToNovel()
     ElMessage.success('章节下移成功')
   }
 }
 
-const deleteChapter = (chapter) => {
+const deleteChapter = async (chapter) => {
   ElMessageBox.confirm(
     `确定要删除章节「${chapter.title}」吗？此操作不可恢复。`,
     '确认删除',
@@ -465,19 +461,19 @@ const deleteChapter = (chapter) => {
       cancelButtonText: '取消',
       type: 'warning'
     }
-  ).then(() => {
+  ).then(async () => {
     const index = chapters.value.findIndex(c => c.id === chapter.id)
     if (index > -1) {
       chapters.value.splice(index, 1)
       // 保存到localStorage
-      saveChaptersToNovel()
+      await saveChaptersToNovel()
       ElMessage.success('章节删除成功')
     }
   })
 }
 
-const saveChapter = () => {
-  chapterFormRef.value.validate((valid) => {
+const saveChapter = async () => {
+  chapterFormRef.value.validate(async (valid) => {
     if (valid) {
       const wordCount = chapterForm.value.content.replace(/<[^>]*>/g, '').length
       
@@ -509,7 +505,7 @@ const saveChapter = () => {
       }
       
       // 保存到localStorage
-      saveChaptersToNovel()
+      await saveChaptersToNovel()
       
       showCreateDialog.value = false
       resetForm()
@@ -517,7 +513,7 @@ const saveChapter = () => {
   })
 }
 
-const resetForm = () => {
+const resetForm = async () => {
   chapterForm.value = {
     title: '',
     summary: '',
@@ -529,22 +525,22 @@ const resetForm = () => {
   tagInput.value = ''
 }
 
-const addChapterTag = () => {
+const addChapterTag = async () => {
   if (tagInput.value.trim() && !chapterForm.value.tags.includes(tagInput.value.trim())) {
     chapterForm.value.tags.push(tagInput.value.trim())
     tagInput.value = ''
   }
 }
 
-const removeChapterTag = (index) => {
+const removeChapterTag = async (index) => {
   chapterForm.value.tags.splice(index, 1)
 }
 
-const sortChapters = () => {
+const sortChapters = async () => {
   ElMessage.info('章节排序功能开发中...')
 }
 
-const batchEdit = () => {
+const batchEdit = async () => {
   if (selectedChapters.value.length === 0) {
     ElMessage.warning('请先选择要编辑的章节')
     return

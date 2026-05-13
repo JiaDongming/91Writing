@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import apiService from '../services/api.js'
+import { getItem, setItem, removeItem } from '@/services/storageCompat'
 
 export const useNovelStore = defineStore('novel', () => {
   // 状态
@@ -26,69 +27,64 @@ export const useNovelStore = defineStore('novel', () => {
   const characters = ref([])
   const worldSettings = ref([])
   
-  // API配置 - 分离官方和自定义配置
+  // API配置（模型偏好，API调用通过后端代理）
   const officialApiConfig = ref({
-    apiKey: '',
-    baseURL: 'https://ai.91hub.vip/v1',
     selectedModel: 'claude-4-sonnet',
-    maxTokens: 2000000,
-    unlimitedTokens: false,
+    maxTokens: null,
+    unlimitedTokens: true,
     temperature: 0.7
   })
-  
+
   const customApiConfig = ref({
-    apiKey: '',
-    baseURL: 'https://api.openai.com/v1',
     selectedModel: 'gpt-3.5-turbo',
-    maxTokens: 2000000,
-    unlimitedTokens: false,
+    maxTokens: null,
+    unlimitedTokens: true,
     temperature: 0.7
   })
-  
-  const currentConfigType = ref('official') // 'official' 或 'custom'
-  const isApiConfigured = ref(false)
-  
+
+  const currentConfigType = ref('official')
+  const isApiConfigured = ref(!!localStorage.getItem('accessToken'))
+
   // 获取当前活动的API配置
   const getCurrentApiConfig = () => {
     return currentConfigType.value === 'official' ? officialApiConfig.value : customApiConfig.value
   }
-  
+
   // 初始化时检查API配置
   const initializeApiConfig = () => {
     try {
-      // 加载配置类型
-      const savedType = localStorage.getItem('apiConfigType') || 'official'
+      const savedType = getItem('apiConfigType') || 'official'
       currentConfigType.value = savedType
-      
-      // 加载官方配置
-      const savedOfficial = localStorage.getItem('officialApiConfig')
+
+      const savedOfficial = getItem('officialApiConfig')
       if (savedOfficial) {
-        const config = JSON.parse(savedOfficial)
-        // 官方配置只允许覆盖API密钥等参数，baseURL始终保持固定
-        officialApiConfig.value = {
-          ...officialApiConfig.value,
-          ...config,
-          baseURL: 'https://ai.91hub.vip/v1' // 强制保持官方地址
-        }
+        try {
+          const config = JSON.parse(savedOfficial)
+          if (config.selectedModel) officialApiConfig.value.selectedModel = config.selectedModel
+          if (config.temperature !== undefined) officialApiConfig.value.temperature = config.temperature
+          if (config.maxTokens !== undefined) officialApiConfig.value.maxTokens = config.maxTokens
+          if (config.unlimitedTokens !== undefined) officialApiConfig.value.unlimitedTokens = config.unlimitedTokens
+        } catch { /* ignore parse errors */ }
       }
-      
-      // 加载自定义配置
-      const savedCustom = localStorage.getItem('customApiConfig')
+
+      const savedCustom = getItem('customApiConfig')
       if (savedCustom) {
-        const config = JSON.parse(savedCustom)
-        customApiConfig.value = { ...customApiConfig.value, ...config }
+        try {
+          const config = JSON.parse(savedCustom)
+          if (config.selectedModel) customApiConfig.value.selectedModel = config.selectedModel
+          if (config.temperature !== undefined) customApiConfig.value.temperature = config.temperature
+          if (config.maxTokens !== undefined) customApiConfig.value.maxTokens = config.maxTokens
+          if (config.unlimitedTokens !== undefined) customApiConfig.value.unlimitedTokens = config.unlimitedTokens
+        } catch { /* ignore parse errors */ }
       }
-      
-      // 使用当前配置类型的配置
+
       const currentConfig = getCurrentApiConfig()
-      isApiConfigured.value = !!currentConfig.apiKey
       apiService.updateConfig(currentConfig)
-      
     } catch (error) {
       console.error('初始化API配置失败:', error)
     }
   }
-  
+
   // 立即执行初始化
   initializeApiConfig()
   
@@ -315,48 +311,25 @@ export const useNovelStore = defineStore('novel', () => {
 
   // API配置方法
   const updateApiConfig = (config, configType = null) => {
-    // 如果没有指定类型，使用当前配置类型
     const targetType = configType || currentConfigType.value
-    
+
     if (targetType === 'official') {
-      // 官方配置：强制保持官方API地址
-      officialApiConfig.value = { 
-        ...officialApiConfig.value, 
-        ...config,
-        baseURL: 'https://ai.91hub.vip/v1'
-      }
+      officialApiConfig.value = { ...officialApiConfig.value, ...config }
     } else {
-      // 自定义配置：允许所有参数更新
       customApiConfig.value = { ...customApiConfig.value, ...config }
     }
-    
-    // 更新apiService配置为当前活动配置
+
     const currentConfig = getCurrentApiConfig()
     apiService.updateConfig(currentConfig)
-    isApiConfigured.value = !!currentConfig.apiKey
   }
-  
+
   // 切换配置类型
   const switchConfigType = (type) => {
     currentConfigType.value = type
-    localStorage.setItem('apiConfigType', type)
-    
-    // 更新apiService配置
+    setItem('apiConfigType', type)
+
     const currentConfig = getCurrentApiConfig()
     apiService.updateConfig(currentConfig)
-    isApiConfigured.value = !!currentConfig.apiKey
-  }
-
-  const validateApiKey = async () => {
-    try {
-      const isValid = await apiService.validateAPIKey()
-      isApiConfigured.value = isValid
-      return isValid
-    } catch (error) {
-      console.error('API密钥验证失败:', error)
-      isApiConfigured.value = false
-      return false
-    }
   }
 
   // 使用真实API生成大纲
@@ -821,7 +794,6 @@ export const useNovelStore = defineStore('novel', () => {
     updateApiConfig,
     switchConfigType,
     getCurrentApiConfig,
-    validateApiKey,
     generateOutlineWithAPI,
     generateOutlineWithAPIStream,
     generateChapterWithAPI,

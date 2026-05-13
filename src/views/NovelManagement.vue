@@ -548,6 +548,8 @@ import {
 } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 import apiService from '@/services/api.js'
+import { listNovels, createNovel as apiCreateNovel, updateNovel as apiUpdateNovel, deleteNovel as apiDeleteNovel } from '@/services/novelApi'
+import { listGenres as apiListGenres } from '@/services/workspaceApi'
 
 const router = useRouter()
 
@@ -571,49 +573,30 @@ const isGeneratingDescription = ref(false)
 const isGeneratingEditDescription = ref(false)
 const isSavingEdit = ref(false)
 
-// 小说数据 - 从localStorage加载
+// 小说数据 - 从后端 API 加载
 const novels = ref([])
+const loading = ref(false)
 
 // 加载小说数据
-const loadNovels = () => {
+const loadNovels = async () => {
+  loading.value = true
   try {
-    const saved = localStorage.getItem('novels')
-    if (saved) {
-      const parsedNovels = JSON.parse(saved)
-      // 将日期字符串转换为Date对象
-      novels.value = parsedNovels.map(novel => ({
-        ...novel,
-        createdAt: new Date(novel.createdAt),
-        updatedAt: new Date(novel.updatedAt),
-        chapterList: (novel.chapterList || []).map(chapter => ({
-          ...chapter,
-          createdAt: chapter.createdAt ? new Date(chapter.createdAt) : new Date(),
-          updatedAt: chapter.updatedAt ? new Date(chapter.updatedAt) : new Date()
-        })),
-        writingRecords: (novel.writingRecords || []).map(record => ({
-          ...record,
-          date: new Date(record.date)
-        }))
-      }))
-    } else {
-      // 如果没有保存的数据，初始化为空
-      novels.value = []
-      // 保存空数据到localStorage
-      saveNovels()
-    }
+    const data = await listNovels()
+    novels.value = data.map(novel => ({
+      ...novel,
+      createdAt: new Date(novel.createdAt),
+      updatedAt: new Date(novel.updatedAt),
+      chapters: novel._count?.chapters || 0,
+      chapterList: novel.chapters || [],
+      characters: novel.characters || [],
+      worldSettings: novel.worldSettings || [],
+      storyEvents: novel.storyEvents || []
+    }))
   } catch (error) {
     console.error('加载小说数据失败:', error)
     novels.value = []
-  }
-}
-
-// 保存小说数据到localStorage
-const saveNovels = () => {
-  try {
-    localStorage.setItem('novels', JSON.stringify(novels.value))
-  } catch (error) {
-    console.error('保存小说数据失败:', error)
-    ElMessage.error('保存数据失败')
+  } finally {
+    loading.value = false
   }
 }
 
@@ -696,7 +679,7 @@ const filteredNovels = computed(() => {
 })
 
 // 方法
-const getStatusType = (status) => {
+const getStatusType = async (status) => {
   const types = {
     writing: 'success',
     completed: 'info',
@@ -705,7 +688,7 @@ const getStatusType = (status) => {
   return types[status] || 'info'
 }
 
-const getStatusText = (status) => {
+const getStatusText = async (status) => {
   const texts = {
     writing: '创作中',
     completed: '已完成',
@@ -714,28 +697,25 @@ const getStatusText = (status) => {
   return texts[status] || '未知'
 }
 
-const getGenreDisplayName = (genreCode) => {
+const getGenreDisplayName = async (genreCode) => {
   return genrePresets.value[genreCode]?.name || genreCode || '未知'
 }
 
 // 加载类型数据
-const loadGenres = () => {
+const loadGenres = async () => {
   try {
-    const saved = localStorage.getItem('novelGenres')
-    if (saved) {
-      const parsed = JSON.parse(saved)
-      // 转换为键值对格式，兼容旧版本
+    const data = await apiListGenres()
+    if (data && data.length > 0) {
       const genresObj = {}
-      parsed.forEach(genre => {
-        genresObj[genre.code] = {
+      data.forEach(genre => {
+        genresObj[genre.code || genre.name] = {
           name: genre.name,
-          tags: genre.tags,
-          prompt: genre.prompt
+          tags: genre.tags || [],
+          prompt: genre.description || ''
         }
       })
       genrePresets.value = genresObj
     } else {
-      // 如果没有保存的数据，加载默认类型
       loadDefaultGenres()
     }
   } catch (error) {
@@ -745,7 +725,7 @@ const loadGenres = () => {
 }
 
 // 加载默认类型
-const loadDefaultGenres = () => {
+const loadDefaultGenres = async () => {
   const defaultGenres = {
     fantasy: {
       name: '玄幻',
@@ -782,7 +762,7 @@ const loadDefaultGenres = () => {
 }
 
 // 更新类型使用计数
-const updateGenreUsageCount = (genreCode) => {
+const updateGenreUsageCount = async (genreCode) => {
   try {
     const saved = localStorage.getItem('novelGenres')
     if (saved) {
@@ -799,18 +779,18 @@ const updateGenreUsageCount = (genreCode) => {
   }
 }
 
-const formatNumber = (num) => {
+const formatNumber = async (num) => {
   if (num >= 10000) {
     return (num / 10000).toFixed(1) + '万'
   }
   return num.toLocaleString()
 }
 
-const formatDate = (date) => {
+const formatDate = async (date) => {
   return new Date(date).toLocaleDateString('zh-CN')
 }
 
-const handleImageError = (e) => {
+const handleImageError = async (e) => {
   // 防止无限循环加载
   if (e.target.src.includes('default-cover.jpg') || e.target.getAttribute('data-error-handled')) {
     // 如果默认图片也加载失败，显示占位符
@@ -832,7 +812,7 @@ const handleImageError = (e) => {
   e.target.src = '/default-cover.jpg'
 }
 
-const handleImageLoad = (e) => {
+const handleImageLoad = async (e) => {
   // 图片加载成功，移除错误标记
   e.target.removeAttribute('data-error-handled')
   
@@ -843,20 +823,20 @@ const handleImageLoad = (e) => {
   }
 }
 
-const openNovel = (novel) => {
+const openNovel = async (novel) => {
   // 跳转到AI写作页面
   router.push(`/writer?novelId=${novel.id}`)
 }
 
-const viewNovelDetails = (novel) => {
+const viewNovelDetails = async (novel) => {
   selectedNovel.value = novel
   showDetailsDialog.value = true
 }
 
-const exportNovel = (novel) => {
+const exportNovel = async (novel) => {
   try {
     // 简化的HTML清理函数
-    const cleanHtml = (htmlString) => {
+    const cleanHtml = async (htmlString) => {
       if (!htmlString) return ''
       return htmlString
         .replace(/<br\s*\/?>/gi, '\n')  // br标签转换为换行
@@ -969,7 +949,7 @@ const exportNovel = (novel) => {
 }
 
 // 批量导出所有小说
-const exportAllNovels = () => {
+const exportAllNovels = async () => {
   try {
     if (filteredNovels.value.length === 0) {
       ElMessage.warning('没有可导出的小说')
@@ -977,7 +957,7 @@ const exportAllNovels = () => {
     }
     
     // 简化的HTML清理函数
-    const cleanHtml = (htmlString) => {
+    const cleanHtml = async (htmlString) => {
       if (!htmlString) return ''
       return htmlString
         .replace(/<br\s*\/?>/gi, '\n')  // br标签转换为换行
@@ -1088,7 +1068,7 @@ const exportAllNovels = () => {
   }
 }
 
-const duplicateNovel = (novel) => {
+const duplicateNovel = async (novel) => {
   const newNovel = {
     ...novel,
     id: Date.now(),
@@ -1097,8 +1077,16 @@ const duplicateNovel = (novel) => {
     updatedAt: new Date()
   }
   novels.value.push(newNovel)
-  // 保存到localStorage
-  saveNovels()
+  // 保存到后端
+  await apiCreateNovel({
+    title: newNovel.title,
+    genre: newNovel.genre,
+    intro: newNovel.description,
+    cover: newNovel.cover || undefined,
+    tags: newNovel.tags,
+    status: 'SERIALIZING'
+  })
+  await loadNovels()
   ElMessage.success('小说复制成功')
 }
 
@@ -1107,38 +1095,37 @@ const deleteNovel = async (novel) => {
     await ElMessageBox.confirm(`确定要删除《${novel.title}》吗？此操作不可恢复。`, '确认删除', {
       type: 'warning'
     })
-    
-    const index = novels.value.findIndex(n => n.id === novel.id)
-    if (index > -1) {
-      novels.value.splice(index, 1)
-      // 保存到localStorage
-      saveNovels()
-      ElMessage.success('删除成功')
-    }
+
+    await apiDeleteNovel(novel.id)
+    await loadNovels()
+    ElMessage.success('删除成功')
   } catch (error) {
-    // 用户取消删除
+    if (error !== 'cancel' && error !== 'close') {
+      console.error('删除小说失败:', error)
+      ElMessage.error(error?.response?.data?.message || '删除失败')
+    }
   }
 }
 
-const addTag = () => {
+const addTag = async () => {
   if (tagInput.value.trim() && !createForm.value.tags.includes(tagInput.value.trim())) {
     createForm.value.tags.push(tagInput.value.trim())
     tagInput.value = ''
   }
 }
 
-const removeTag = (index) => {
+const removeTag = async (index) => {
   createForm.value.tags.splice(index, 1)
 }
 
 const fileInput = ref()
 
-const triggerFileInput = () => {
+const triggerFileInput = async () => {
   console.log('触发文件选择器')
   fileInput.value?.click()
 }
 
-const handleNativeFileChange = (event) => {
+const handleNativeFileChange = async (event) => {
   const file = event.target.files[0]
   console.log('原生文件选择事件触发:', file)
   
@@ -1190,12 +1177,12 @@ const handleNativeFileChange = (event) => {
   reader.readAsDataURL(file)
 }
 
-const handleCoverSuccess = (response, file) => {
+const handleCoverSuccess = async (response, file) => {
   // 这个函数现在不会被调用，因为我们阻止了默认上传
   // 但保留以备后续扩展
 }
 
-const removeCover = () => {
+const removeCover = async () => {
   createForm.value.cover = ''
   ElMessage.success('封面已移除')
 }
@@ -1203,58 +1190,46 @@ const removeCover = () => {
 const createNovel = async () => {
   try {
     await createFormRef.value.validate()
-    
-    const newNovel = {
-      ...createForm.value,
-      id: Date.now(),
-      status: 'writing',
-      chapters: 0,
-      wordCount: 0,
-      totalWords: 0,
-      avgWordsPerChapter: 0,
-      writingDays: 0,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      chapterList: [],
-      writingRecords: [],
-      genrePrompt: genrePresets[createForm.value.genre]?.prompt || '',
-      // 章节管理需要的数据结构
-      characters: [],
-      worldSettings: [],
-      corpusData: [],
-      events: []
+
+    const data = {
+      title: createForm.value.title,
+      genre: createForm.value.genre,
+      intro: createForm.value.description,
+      cover: createForm.value.cover || undefined,
+      tags: createForm.value.tags,
+      status: 'SERIALIZING'
     }
-    
-    novels.value.unshift(newNovel)
-    
+
+    const newNovel = await apiCreateNovel(data)
+
     // 更新类型使用计数
     updateGenreUsageCount(createForm.value.genre)
-    
-    // 保存到localStorage
-    saveNovels()
-    
+
+    // 重新加载列表
+    await loadNovels()
+
     ElMessage.success('小说创建成功！即将跳转到编辑区...')
     showCreateDialog.value = false
     resetCreateForm()
-    
+
     // 创建成功后跳转到编辑页面
     setTimeout(() => {
       router.push(`/writer?novelId=${newNovel.id}`)
     }, 1000)
   } catch (error) {
     console.error('创建小说失败:', error)
-    ElMessage.error('创建小说失败')
+    ElMessage.error(error?.response?.data?.message || '创建小说失败')
   }
 }
 
 // 监听类型选择，自动填充标签
-const onGenreChange = (genre) => {
+const onGenreChange = async (genre) => {
   if (genrePresets.value[genre]) {
     createForm.value.tags = [...genrePresets.value[genre].tags]
   }
 }
 
-const resetCreateForm = () => {
+const resetCreateForm = async () => {
   createForm.value = {
     title: '',
     genre: '',
@@ -1266,7 +1241,7 @@ const resetCreateForm = () => {
 }
 
 // 编辑小说信息
-const editNovelInfo = (novel) => {
+const editNovelInfo = async (novel) => {
   editingNovel.value = novel
   editForm.value = {
     title: novel.title,
@@ -1280,7 +1255,7 @@ const editNovelInfo = (novel) => {
 }
 
 // 重置编辑表单
-const resetEditForm = () => {
+const resetEditForm = async () => {
   editForm.value = {
     title: '',
     genre: '',
@@ -1295,12 +1270,12 @@ const resetEditForm = () => {
 }
 
 // 编辑表单的类型变化处理
-const onEditGenreChange = (genre) => {
+const onEditGenreChange = async (genre) => {
   // 可以选择是否自动更新标签，这里不自动更新，让用户手动调整
 }
 
 // 添加编辑标签
-const addEditTag = () => {
+const addEditTag = async () => {
   const tag = editTagInput.value.trim()
   if (tag && !editForm.value.tags.includes(tag)) {
     editForm.value.tags.push(tag)
@@ -1309,17 +1284,17 @@ const addEditTag = () => {
 }
 
 // 移除编辑标签
-const removeEditTag = (index) => {
+const removeEditTag = async (index) => {
   editForm.value.tags.splice(index, 1)
 }
 
 // 触发编辑文件选择
-const triggerEditFileInput = () => {
+const triggerEditFileInput = async () => {
   editFileInput.value?.click()
 }
 
 // 处理编辑文件变化
-const handleEditFileChange = (event) => {
+const handleEditFileChange = async (event) => {
   const file = event.target.files[0]
   if (!file) return
   
@@ -1348,7 +1323,7 @@ const handleEditFileChange = (event) => {
 }
 
 // 移除编辑封面
-const removeEditCover = () => {
+const removeEditCover = async () => {
   editForm.value.cover = ''
   // 清除文件输入框的值
   if (editFileInput.value) {
@@ -1441,8 +1416,16 @@ const updateNovelInfo = async () => {
         updateGenreUsageCount(editForm.value.genre)
       }
       
-      // 保存到localStorage
-      saveNovels()
+      // 保存到后端
+      await apiUpdateNovel(editingNovel.value.id, {
+        title: editForm.value.title,
+        genre: editForm.value.genre,
+        intro: editForm.value.description,
+        cover: editForm.value.cover || undefined,
+        tags: editForm.value.tags,
+        status: editForm.value.status === 'writing' ? 'SERIALIZING' : editForm.value.status === 'completed' ? 'COMPLETED' : 'DRAFT'
+      })
+      await loadNovels()
       
       ElMessage.success('小说信息更新成功')
       showEditDialog.value = false
@@ -1460,7 +1443,7 @@ const updateNovelInfo = async () => {
   }
 }
 
-const editChapter = (chapter) => {
+const editChapter = async (chapter) => {
   ElMessage.info('跳转到章节编辑页面')
 }
 
@@ -1552,7 +1535,7 @@ const generateDescription = async () => {
 }
 
 // 备选方案：使用本地模板生成简介
-const generateDescriptionFromTemplate = () => {
+const generateDescriptionFromTemplate = async () => {
   const title = createForm.value.title.trim()
   const genreInfo = genrePresets.value[createForm.value.genre]
   

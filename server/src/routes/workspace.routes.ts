@@ -30,6 +30,7 @@ const goalSchema = z.object({
   startDate: z.coerce.date(),
   endDate: z.coerce.date(),
   status: z.string().optional(),
+  metadata: z.any().optional(),
 });
 
 const providerSchema = z.object({
@@ -111,6 +112,47 @@ router.post(
   },
 );
 
+router.put(
+  "/prompts/:id",
+  async (request: AuthenticatedRequest, response: Response) => {
+    try {
+      const id = request.params.id as string;
+
+      // 验证所有权
+      const existing = await prisma.promptTemplate.findUnique({ where: { id } });
+      if (!existing || existing.userId !== request.auth!.userId) {
+        return response.status(404).json({ message: "提示词不存在" });
+      }
+
+      const input = promptSchema.partial().parse(request.body);
+      const prompt = await prisma.promptTemplate.update({
+        where: { id },
+        data: input,
+      });
+
+      response.json(prompt);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "更新提示词失败";
+      response.status(400).json({ message });
+    }
+  },
+);
+
+router.delete(
+  "/prompts/:id",
+  async (request: AuthenticatedRequest, response: Response) => {
+    const id = request.params.id as string;
+
+    const existing = await prisma.promptTemplate.findUnique({ where: { id } });
+    if (!existing || existing.userId !== request.auth!.userId) {
+      return response.status(404).json({ message: "提示词不存在" });
+    }
+
+    await prisma.promptTemplate.delete({ where: { id } });
+    response.status(204).send();
+  },
+);
+
 router.get(
   "/genres",
   async (request: AuthenticatedRequest, response: Response) => {
@@ -145,6 +187,47 @@ router.post(
         error instanceof Error ? error.message : "创建类型配置失败";
       response.status(400).json({ message });
     }
+  },
+);
+
+router.put(
+  "/genres/:id",
+  async (request: AuthenticatedRequest, response: Response) => {
+    try {
+      const id = request.params.id as string;
+
+      const existing = await prisma.genrePreset.findUnique({ where: { id } });
+      if (!existing || existing.userId !== request.auth!.userId) {
+        return response.status(404).json({ message: "类型配置不存在" });
+      }
+
+      const input = genreSchema.partial().parse(request.body);
+      const genre = await prisma.genrePreset.update({
+        where: { id },
+        data: input,
+      });
+
+      response.json(genre);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "更新类型配置失败";
+      response.status(400).json({ message });
+    }
+  },
+);
+
+router.delete(
+  "/genres/:id",
+  async (request: AuthenticatedRequest, response: Response) => {
+    const id = request.params.id as string;
+
+    const existing = await prisma.genrePreset.findUnique({ where: { id } });
+    if (!existing || existing.userId !== request.auth!.userId) {
+      return response.status(404).json({ message: "类型配置不存在" });
+    }
+
+    await prisma.genrePreset.delete({ where: { id } });
+    response.status(204).send();
   },
 );
 
@@ -188,6 +271,47 @@ router.post(
         error instanceof Error ? error.message : "创建写作目标失败";
       response.status(400).json({ message });
     }
+  },
+);
+
+router.put(
+  "/goals/:id",
+  async (request: AuthenticatedRequest, response: Response) => {
+    try {
+      const id = request.params.id as string;
+
+      const existing = await prisma.writingGoal.findUnique({ where: { id } });
+      if (!existing || existing.userId !== request.auth!.userId) {
+        return response.status(404).json({ message: "写作目标不存在" });
+      }
+
+      const input = goalSchema.partial().parse(request.body);
+      const goal = await prisma.writingGoal.update({
+        where: { id },
+        data: input,
+      });
+
+      response.json(goal);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "更新写作目标失败";
+      response.status(400).json({ message });
+    }
+  },
+);
+
+router.delete(
+  "/goals/:id",
+  async (request: AuthenticatedRequest, response: Response) => {
+    const id = request.params.id as string;
+
+    const existing = await prisma.writingGoal.findUnique({ where: { id } });
+    if (!existing || existing.userId !== request.auth!.userId) {
+      return response.status(404).json({ message: "写作目标不存在" });
+    }
+
+    await prisma.writingGoal.delete({ where: { id } });
+    response.status(204).send();
   },
 );
 
@@ -244,6 +368,60 @@ router.post(
         error instanceof Error ? error.message : "保存模型配置失败";
       response.status(400).json({ message });
     }
+  },
+);
+
+router.put(
+  "/providers/:id",
+  async (request: AuthenticatedRequest, response: Response) => {
+    try {
+      const id = request.params.id as string;
+
+      const existing = await prisma.aiProviderConfig.findUnique({ where: { id } });
+      if (!existing || existing.userId !== request.auth!.userId) {
+        return response.status(404).json({ message: "模型配置不存在" });
+      }
+
+      const input = providerSchema.partial().parse(request.body);
+
+      if (input.isDefault) {
+        await prisma.aiProviderConfig.updateMany({
+          where: {
+            userId: request.auth!.userId,
+            isDefault: true,
+          },
+          data: {
+            isDefault: false,
+          },
+        });
+      }
+
+      const provider = await prisma.aiProviderConfig.update({
+        where: { id },
+        data: input,
+      });
+
+      response.json(provider);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "更新模型配置失败";
+      response.status(400).json({ message });
+    }
+  },
+);
+
+router.delete(
+  "/providers/:id",
+  async (request: AuthenticatedRequest, response: Response) => {
+    const id = request.params.id as string;
+
+    const existing = await prisma.aiProviderConfig.findUnique({ where: { id } });
+    if (!existing || existing.userId !== request.auth!.userId) {
+      return response.status(404).json({ message: "模型配置不存在" });
+    }
+
+    await prisma.aiProviderConfig.delete({ where: { id } });
+    response.status(204).send();
   },
 );
 

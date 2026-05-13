@@ -122,14 +122,16 @@
             </el-alert>
             
             <el-form :model="officialForm" label-width="80px" size="small" class="config-form">
-              <el-form-item label="API密钥" required>
+              <el-form-item label="API密钥">
                 <el-input
                   v-model="officialForm.apiKey"
                   type="password"
-                  placeholder="请输入API密钥"
+                  placeholder="后端统一管理，无需填写"
                   show-password
                   clearable
+                  disabled
                 />
+                <div class="form-tip">API 调用通过后端代理，无需单独配置密钥</div>
               </el-form-item>
               
               <el-form-item label="API地址">
@@ -317,6 +319,7 @@
 </template>
 
 <script setup>
+import { getItem, setItem, removeItem } from '@/services/storageCompat'
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useNovelStore } from '../stores/novel.js'
@@ -441,27 +444,12 @@ const handleOfficialUnlimitedTokensChange = () => {
 }
 
 const saveOfficialConfig = async () => {
-  if (!officialForm.apiKey) {
-    ElMessage.warning('请输入API密钥')
-    return
-  }
-  
-  // 确保官方配置始终使用正确的API地址
-  officialForm.baseURL = 'https://ai.91hub.vip/v1'
-  
   validating.value = true
   try {
-    // 使用新的store API，指定配置类型为官方配置
     store.updateApiConfig(officialForm, 'official')
     store.switchConfigType('official')
-    const isValid = await store.validateApiKey()
-    
-    if (isValid) {
-      ElMessage.success('官方配置保存成功')
-      localStorage.setItem('officialApiConfig', JSON.stringify(officialForm))
-    } else {
-      ElMessage.error('API密钥验证失败，请检查配置')
-    }
+    setItem('officialApiConfig', JSON.stringify(officialForm))
+    ElMessage.success('配置保存成功')
   } catch (error) {
     ElMessage.error('配置保存失败：' + error.message)
   } finally {
@@ -470,26 +458,11 @@ const saveOfficialConfig = async () => {
 }
 
 const testOfficialConnection = async () => {
-  if (!officialForm.apiKey) {
-    ElMessage.warning('请先输入API密钥')
-    return
-  }
-  
-  // 确保官方配置始终使用正确的API地址
-  officialForm.baseURL = 'https://ai.91hub.vip/v1'
-  
   validating.value = true
   try {
-    // 使用新的store API进行测试
     store.updateApiConfig(officialForm, 'official')
     store.switchConfigType('official')
-    const isValid = await store.validateApiKey()
-    
-    if (isValid) {
-      ElMessage.success('官方配置连接测试成功')
-    } else {
-      ElMessage.error('连接测试失败')
-    }
+    ElMessage.success('配置已就绪，AI 调用将通过后端代理')
   } catch (error) {
     ElMessage.error('连接测试失败：' + error.message)
   } finally {
@@ -542,11 +515,11 @@ const removeCustomModel = (modelId) => {
 }
 
 const saveCustomModels = () => {
-  localStorage.setItem('customModels', JSON.stringify(customModels.value))
+  setItem('customModels', JSON.stringify(customModels.value))
 }
 
 const loadCustomModels = () => {
-  const saved = localStorage.getItem('customModels')
+  const saved = getItem('customModels')
   if (saved) {
     try {
       customModels.value = JSON.parse(saved)
@@ -557,24 +530,12 @@ const loadCustomModels = () => {
 }
 
 const saveCustomConfig = async () => {
-  if (!customForm.apiKey) {
-    ElMessage.warning('请输入API密钥')
-    return
-  }
-  
   validating.value = true
   try {
-    // 使用新的store API，指定配置类型为自定义配置
     store.updateApiConfig(customForm, 'custom')
     store.switchConfigType('custom')
-    const isValid = await store.validateApiKey()
-    
-    if (isValid) {
-      ElMessage.success('自定义配置保存成功')
-      localStorage.setItem('customApiConfig', JSON.stringify(customForm))
-    } else {
-      ElMessage.error('API密钥验证失败，请检查配置')
-    }
+    setItem('customApiConfig', JSON.stringify(customForm))
+    ElMessage.success('自定义配置保存成功')
   } catch (error) {
     ElMessage.error('配置保存失败：' + error.message)
   } finally {
@@ -583,23 +544,11 @@ const saveCustomConfig = async () => {
 }
 
 const testCustomConnection = async () => {
-  if (!customForm.apiKey) {
-    ElMessage.warning('请先输入API密钥')
-    return
-  }
-  
   validating.value = true
   try {
-    // 使用新的store API进行测试
     store.updateApiConfig(customForm, 'custom')
     store.switchConfigType('custom')
-    const isValid = await store.validateApiKey()
-    
-    if (isValid) {
-      ElMessage.success('自定义配置连接测试成功')
-    } else {
-      ElMessage.error('连接测试失败')
-    }
+    ElMessage.success('配置已就绪，AI 调用将通过后端代理')
   } catch (error) {
     ElMessage.error('连接测试失败：' + error.message)
   } finally {
@@ -616,18 +565,18 @@ const resetCustomConfig = () => {
     unlimitedTokens: false,
     temperature: 0.7
   })
-  localStorage.removeItem('customApiConfig')
+  removeItem('customApiConfig')
   ElMessage.success('自定义配置已重置')
 }
 
 // 加载保存的配置
 const loadSavedConfig = () => {
   // 加载配置类型
-  const savedType = localStorage.getItem('apiConfigType') || 'official'
+  const savedType = getItem('apiConfigType') || 'official'
   configType.value = savedType
   
   // 加载官方配置 - 只允许加载API密钥，其他参数保持默认值
-  const savedOfficial = localStorage.getItem('officialApiConfig')
+  const savedOfficial = getItem('officialApiConfig')
   if (savedOfficial) {
     try {
       const config = JSON.parse(savedOfficial)
@@ -658,7 +607,7 @@ const loadSavedConfig = () => {
   }
   
   // 加载自定义配置 - 完全独立的数据源
-  const savedCustom = localStorage.getItem('customApiConfig')
+  const savedCustom = getItem('customApiConfig')
   if (savedCustom) {
     try {
       const config = JSON.parse(savedCustom)

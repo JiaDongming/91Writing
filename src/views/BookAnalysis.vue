@@ -583,6 +583,8 @@
 </template>
 
 <script setup>
+import { getItem, setItem, removeItem } from '@/services/storageCompat'
+import { listPrompts } from '@/services/workspaceApi'
 import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
 import { 
@@ -661,23 +663,19 @@ const analysisSteps = [
 const analysisTemplates = ref([])
 
 // 从提示词库加载拆书模板
-const loadAnalysisTemplates = () => {
-  const savedPrompts = localStorage.getItem('prompts')
-  if (savedPrompts) {
-    try {
-      const allPrompts = JSON.parse(savedPrompts)
-      analysisTemplates.value = allPrompts
-        .filter(prompt => prompt.category === 'book-analysis')
-        .map(prompt => ({
-          id: prompt.id,
-          name: prompt.title,
-          icon: '📚',
-          description: prompt.description,
-          content: prompt.content
-        }))
-    } catch (error) {
-      console.error('加载拆书模板失败:', error)
-      // 使用默认模板
+const loadAnalysisTemplates = async () => {
+  try {
+    const allPrompts = await listPrompts()
+    analysisTemplates.value = allPrompts
+      .filter(prompt => prompt.category === 'book-analysis')
+      .map(prompt => ({
+        id: prompt.id,
+        name: prompt.title,
+        icon: '📚',
+        description: prompt.variables?.description || '',
+        content: prompt.content
+      }))
+    if (analysisTemplates.value.length === 0) {
       analysisTemplates.value = [
         {
           id: 'comprehensive',
@@ -688,6 +686,17 @@ const loadAnalysisTemplates = () => {
         }
       ]
     }
+  } catch (error) {
+    console.error('加载拆书模板失败:', error)
+    analysisTemplates.value = [
+      {
+        id: 'comprehensive',
+        name: '综合拆书分析',
+        icon: '📚',
+        description: '全方位分析小说的写作技法、结构特点和创作亮点',
+        content: '请对以下小说文本进行深度拆书分析...'
+      }
+    ]
   }
 }
 
@@ -1513,7 +1522,7 @@ const regenerateChapterSummary = async () => {
 // 保存提示词模板到本地存储
 const saveSummaryPromptTemplate = () => {
   try {
-    localStorage.setItem('chapterSummaryPromptTemplate', summaryPromptTemplate.value)
+    setItem('chapterSummaryPromptTemplate', summaryPromptTemplate.value)
   } catch (error) {
     console.error('保存提示词模板失败:', error)
   }
@@ -1522,7 +1531,7 @@ const saveSummaryPromptTemplate = () => {
 // 从本地存储加载提示词模板
 const loadSummaryPromptTemplate = () => {
   try {
-    const saved = localStorage.getItem('chapterSummaryPromptTemplate')
+    const saved = getItem('chapterSummaryPromptTemplate')
     if (saved) {
       summaryPromptTemplate.value = saved
     }
@@ -1579,8 +1588,8 @@ watch(summaryPromptTemplate, () => {
 })
 
 // 组件挂载时加载模板
-onMounted(() => {
-  loadAnalysisTemplates()
+onMounted(async () => {
+  await loadAnalysisTemplates()
   loadSummaryPromptTemplate()
 })
 </script>

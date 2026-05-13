@@ -231,12 +231,14 @@
 </template>
 
 <script setup>
+import { listNovels } from '@/services/novelApi'
+import { listGoals } from '@/services/workspaceApi'
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useNovelStore } from '@/stores/novel'
-import { 
-  Plus, Edit, Document, EditPen, Notebook, CreditCard, 
-  ChatLineSquare, Trophy 
+import {
+  Plus, Edit, Document, EditPen, Notebook, CreditCard,
+  ChatLineSquare, Trophy
 } from '@element-plus/icons-vue'
 import WritingGoals from '@/components/WritingGoals.vue'
 import billingService from '@/services/billing.js'
@@ -244,43 +246,23 @@ import billingService from '@/services/billing.js'
 const router = useRouter()
 const novelStore = useNovelStore()
 
-// 响应式数据
 const showGoalsDialog = ref(false)
-const stats = computed(() => {
-  // 从本地存储获取真实的小说数据
-  const novelsData = JSON.parse(localStorage.getItem('novels') || '[]')
-  
-  // 使用计费服务获取真实的token使用统计
-  const usageStats = billingService.getUsageStats()
-  
-  // 计算真实统计数据
-  const totalNovels = novelsData.length
-  const totalWords = novelsData.reduce((sum, novel) => sum + (novel.wordCount || 0), 0)
-  const totalChapters = novelsData.reduce((sum, novel) => sum + ((novel.chapterList || []).length), 0)
-  const totalTokens = usageStats.totalInputTokens + usageStats.totalOutputTokens
-  
-  return {
-    totalNovels,
-    totalWords,
-    totalChapters,
-    totalTokens
-  }
+
+const stats = ref({
+  totalNovels: 0,
+  totalWords: 0,
+  totalChapters: 0,
+  totalTokens: 0
 })
 
-// 添加响应式的目标数据状态
 const goalsRefreshTrigger = ref(0)
-const maxDisplayGoals = ref(3) // 首页最多显示的目标数量
+const maxDisplayGoals = ref(3)
 
-// 获取所有活跃目标
+const allGoals = ref([])
+
 const activeGoals = computed(() => {
-  // 触发重新计算（通过依赖goalsRefreshTrigger）
   goalsRefreshTrigger.value
-  
-  // 从本地存储获取真实的写作目标数据
-  const goalsData = JSON.parse(localStorage.getItem('writingGoals') || '[]')
-  const active = goalsData.filter(goal => goal.status === 'active')
-  
-  // 按优先级排序（priority字段，数字越小优先级越高），如果没有priority则按创建时间排序
+  const active = allGoals.value.filter(goal => goal.status === 'active')
   return active.sort((a, b) => {
     if (a.priority !== undefined && b.priority !== undefined) {
       return a.priority - b.priority
@@ -290,6 +272,38 @@ const activeGoals = computed(() => {
     return new Date(a.createdAt || 0) - new Date(b.createdAt || 0)
   })
 })
+
+const allNovels = ref([])
+
+async function loadStats() {
+  try {
+    const [novels, goals, usageStats] = await Promise.all([
+      listNovels(),
+      listGoals(),
+      billingService.getUsageStats()
+    ])
+    allNovels.value = novels
+    const totalNovels = novels.length
+    const totalWords = novels.reduce((sum, n) => sum + (n.wordCount || 0), 0)
+    const totalChapters = novels.reduce((sum, n) => sum + (n._count?.chapters || 0), 0)
+    const totalTokens = (usageStats.totalInputTokens || 0) + (usageStats.totalOutputTokens || 0)
+    stats.value = { totalNovels, totalWords, totalChapters, totalTokens }
+
+    allGoals.value = goals.map(g => ({
+      id: g.id,
+      title: g.title,
+      type: g.metadata?.type || ({ DAILY: 'daily', WEEKLY: 'weekly', MONTHLY: 'monthly' }[g.period] || 'daily'),
+      targetValue: g.targetWords,
+      currentValue: g.currentWords,
+      description: g.metadata?.description || '',
+      status: ({ ACTIVE: 'active', COMPLETED: 'completed', FAILED: 'failed', PAUSED: 'paused' }[g.status] || 'active'),
+      priority: g.metadata?.priority || 0,
+      createdAt: g.createdAt
+    }))
+  } catch (error) {
+    console.error('加载首页数据失败:', error)
+  }
+}
 
 // 首页显示的目标（限制数量）
 const displayedGoals = computed(() => {
@@ -316,17 +330,13 @@ const currentGoal = computed(() => {
 })
 
 const recentNovels = computed(() => {
-  // 从本地存储获取真实的小说数据
-  const novelsData = JSON.parse(localStorage.getItem('novels') || '[]')
-  
-  // 按更新时间排序，取前3个
-  return novelsData
+  return allNovels.value
     .sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0))
     .slice(0, 3)
     .map(novel => ({
       id: novel.id,
       title: novel.title,
-      description: novel.description,
+      description: novel.intro || '',
       wordCount: novel.wordCount || 0,
       updatedAt: new Date(novel.updatedAt || Date.now()),
       cover: novel.cover
@@ -429,18 +439,13 @@ const refreshData = () => {
 window.refreshHomeData = refreshData
 
 // 生命周期
-onMounted(() => {
-  // 监听localStorage变化，以便实时更新目标数据
-  window.addEventListener('storage', (e) => {
-    if (e.key === 'writingGoals') {
-      refreshData()
-    }
-  })
-  
-  // 监听页面可见性变化
+onMounted(async () => {
+  await loadStats()
+
+  // 监听页面可见性变化，回到页面时刷新数据
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) {
-      refreshData()
+      loadStats()
     }
   })
 })

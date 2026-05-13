@@ -138,14 +138,33 @@
           </el-button>
 
           <!-- API配置状态 -->
-          <el-button 
-            @click="showApiConfig = true" 
+          <el-button
+            @click="showApiConfig = true"
             :type="isApiConfigured ? 'success' : 'warning'"
             size="small"
           >
             <el-icon><Key /></el-icon>
             {{ isApiConfigured ? 'API已配置' : 'API配置' }}
           </el-button>
+
+          <!-- 用户信息 -->
+          <el-dropdown v-if="authStore.isLoggedIn" trigger="click">
+            <span class="user-info">
+              <el-icon><User /></el-icon>
+              <span class="user-name">{{ authStore.user?.nickname || '用户' }}</span>
+              <el-icon><ArrowDown /></el-icon>
+            </span>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item disabled>
+                  {{ authStore.user?.email }}
+                </el-dropdown-item>
+                <el-dropdown-item divided @click="handleLogout">
+                  退出登录
+                </el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
         </div>
       </div>
       
@@ -170,22 +189,25 @@
 </template>
 
 <script setup>
+import { getItem, setItem, removeItem } from '@/services/storageCompat'
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useNovelStore } from '@/stores/novel'
-import { 
-  House, Document, ChatLineSquare, Collection, Notebook, Aim, 
+import {
+  House, Document, ChatLineSquare, Collection, Notebook, Aim,
   CreditCard, Setting, Key, Tools, EditPen, DataAnalysis,
-  Expand, Fold, Bell 
+  Expand, Fold, Bell, User, ArrowDown
 } from '@element-plus/icons-vue'
 import ApiConfig from '@/components/ApiConfig.vue'
 import AnnouncementDialog from '@/components/AnnouncementDialog.vue'
 import { getLatestAnnouncement } from '@/config/announcements.js'
 import { ElMessage } from 'element-plus'
+import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
 const route = useRoute()
 const novelStore = useNovelStore()
+const authStore = useAuthStore()
 
 // 响应式数据
 const isCollapse = ref(false)
@@ -242,7 +264,7 @@ const customModels = computed(() => {
   
   try {
     // 从ApiConfig组件的配置中读取自定义模型
-    const savedCustomModels = localStorage.getItem('customModels')
+    const savedCustomModels = getItem('customModels')
     if (savedCustomModels) {
       const parsed = JSON.parse(savedCustomModels)
       models.push(...parsed)
@@ -315,7 +337,7 @@ const pageTitle = computed(() => {
 const getCurrentConfigType = () => {
   try {
     // 从localStorage获取配置类型
-    const savedConfigType = localStorage.getItem('apiConfigType')
+    const savedConfigType = getItem('apiConfigType')
     console.log('从localStorage获取的配置类型:', savedConfigType) // 调试日志
     
     // 如果没有保存的配置类型，尝试通过API地址判断
@@ -342,6 +364,11 @@ const getCurrentConfigType = () => {
 // 方法
 const toggleSidebar = () => {
   isCollapse.value = !isCollapse.value
+}
+
+const handleLogout = async () => {
+  await authStore.logout()
+  router.push('/login')
 }
 
 const handleMenuSelect = (index) => {
@@ -380,7 +407,7 @@ const handleModelChange = (modelId) => {
       newConfigType = 'official'
       
       // 加载官方配置的基础参数
-      const savedOfficialConfig = localStorage.getItem('officialApiConfig')
+      const savedOfficialConfig = getItem('officialApiConfig')
       if (savedOfficialConfig) {
         newConfig = JSON.parse(savedOfficialConfig)
       } else {
@@ -396,9 +423,9 @@ const handleModelChange = (modelId) => {
       newConfig.selectedModel = modelId
       
       // 保存配置类型
-      localStorage.setItem('apiConfigType', 'official')
+      setItem('apiConfigType', 'official')
       // 保存官方配置
-      localStorage.setItem('officialApiConfig', JSON.stringify(newConfig))
+      setItem('officialApiConfig', JSON.stringify(newConfig))
       
     } else if (isCustomModel) {
       console.log('选择了自定义模型，切换到自定义配置') // 调试日志
@@ -406,7 +433,7 @@ const handleModelChange = (modelId) => {
       newConfigType = 'custom'
       
       // 加载自定义配置的基础参数
-      const savedCustomConfig = localStorage.getItem('customApiConfig')
+      const savedCustomConfig = getItem('customApiConfig')
       if (savedCustomConfig) {
         newConfig = JSON.parse(savedCustomConfig)
       } else {
@@ -422,9 +449,9 @@ const handleModelChange = (modelId) => {
       newConfig.selectedModel = modelId
       
       // 保存配置类型
-      localStorage.setItem('apiConfigType', 'custom')
+      setItem('apiConfigType', 'custom')
       // 保存自定义配置
-      localStorage.setItem('customApiConfig', JSON.stringify(newConfig))
+      setItem('customApiConfig', JSON.stringify(newConfig))
       
     } else {
       console.error('未知的模型类型:', modelId)
@@ -483,7 +510,7 @@ const getModelDisplayName = (modelId) => {
 const initializeModelSelector = () => {
   try {
     // 获取配置类型
-    const savedConfigType = localStorage.getItem('apiConfigType') || 'official'
+    const savedConfigType = getItem('apiConfigType') || 'official'
     configType.value = savedConfigType
     
     // 获取当前选中的模型
@@ -529,7 +556,7 @@ onMounted(() => {
   
   // 手动触发一次检查（处理同页面内的变化）
   const checkConfigChange = () => {
-    const currentType = localStorage.getItem('apiConfigType')
+    const currentType = getItem('apiConfigType')
     if (currentType !== configType.value) {
       console.log('检测到配置类型变化:', configType.value, '->', currentType)
       initializeModelSelector()
@@ -669,6 +696,26 @@ onUnmounted(() => {
 
 .model-selector .el-select .el-input__inner {
   font-size: 13px;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  color: #606266;
+  font-size: 14px;
+}
+
+.user-info:hover {
+  color: #409eff;
+}
+
+.user-name {
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* 模型分组样式 */

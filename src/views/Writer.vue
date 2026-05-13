@@ -2124,6 +2124,7 @@
 </template>
 
 <script setup>
+import { getItem, setItem, removeItem } from '@/services/storageCompat'
 import { ref, computed, onMounted, onUnmounted, watch, shallowRef, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -2968,7 +2969,7 @@ watch(streamingContent, () => {
 
 // 加载提示词数据
 const loadPrompts = () => {
-  const savedPrompts = localStorage.getItem('prompts')
+  const savedPrompts = getItem('prompts')
   if (savedPrompts) {
     try {
       availablePrompts.value = JSON.parse(savedPrompts)
@@ -3224,7 +3225,7 @@ const getDefaultPrompts = () => {
 // 保存提示词到本地存储
 const savePrompts = () => {
   try {
-    localStorage.setItem('prompts', JSON.stringify(availablePrompts.value))
+    setItem('prompts', JSON.stringify(availablePrompts.value))
   } catch (error) {
     console.error('保存提示词失败:', error)
   }
@@ -5476,7 +5477,7 @@ const resetOptimizePromptDialog = () => {
 }
 
 const getOptimizePrompts = () => {
-  const prompts = JSON.parse(localStorage.getItem('prompts') || '[]')
+  const prompts = JSON.parse(getItem('prompts') || '[]')
   return prompts.filter(p => p.category === 'polish' || p.category === 'optimize')
 }
 
@@ -7623,14 +7624,14 @@ const saveNovelData = () => {
     totalWords: totalWordCount
   }
   
-  const novels = JSON.parse(localStorage.getItem('novels') || '[]')
+  const novels = JSON.parse(getItem('novels') || '[]')
   const index = novels.findIndex(n => n.id === currentNovel.value.id)
   if (index > -1) {
     novels[index] = novelData
   } else {
     novels.push(novelData)
   }
-  localStorage.setItem('novels', JSON.stringify(novels))
+  setItem('novels', JSON.stringify(novels))
 }
 
 // 初始化
@@ -7638,7 +7639,7 @@ const initNovel = () => {
   const novelId = parseInt(route.query.novelId)
   if (novelId) {
     // 从localStorage加载小说数据
-    const novels = JSON.parse(localStorage.getItem('novels') || '[]')
+    const novels = JSON.parse(getItem('novels') || '[]')
     const novel = novels.find(n => n.id === novelId)
     
     if (novel) {

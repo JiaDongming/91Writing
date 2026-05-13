@@ -299,12 +299,52 @@
 </template>
 
 <script setup>
+import { listGoals, createGoal, updateGoal, deleteGoal as apiDeleteGoal } from '@/services/workspaceApi'
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   Plus, Calendar, Clock, TrendCharts, Trophy, Edit, MoreFilled,
   VideoPause, Delete, Rank
 } from '@element-plus/icons-vue'
+
+const PERIOD_TO_TYPE = { DAILY: 'daily', WEEKLY: 'weekly', MONTHLY: 'monthly' }
+const TYPE_TO_PERIOD = { daily: 'DAILY', weekly: 'WEEKLY', monthly: 'MONTHLY' }
+const STATUS_MAP = { ACTIVE: 'active', COMPLETED: 'completed', FAILED: 'failed', PAUSED: 'paused' }
+const STATUS_REVERSE = { active: 'ACTIVE', completed: 'COMPLETED', failed: 'FAILED', paused: 'PAUSED' }
+
+const mapGoalFromBackend = (g) => ({
+  id: g.id,
+  title: g.title,
+  type: g.metadata?.type || PERIOD_TO_TYPE[g.period] || 'daily',
+  targetValue: g.targetWords,
+  currentValue: g.currentWords,
+  description: g.metadata?.description || '',
+  startDate: g.startDate,
+  endDate: g.endDate,
+  status: STATUS_MAP[g.status] || 'active',
+  unit: g.metadata?.unit || '字',
+  priority: g.metadata?.priority || 0,
+  createdAt: g.createdAt,
+  updatedAt: g.updatedAt,
+  completedAt: g.metadata?.completedAt || null
+})
+
+const mapGoalToBackend = (g) => ({
+  title: g.title,
+  period: TYPE_TO_PERIOD[g.type] || 'DAILY',
+  targetWords: g.targetValue,
+  currentWords: g.currentValue,
+  startDate: g.startDate,
+  endDate: g.endDate,
+  status: STATUS_REVERSE[g.status] || 'ACTIVE',
+  metadata: {
+    type: g.type,
+    description: g.description,
+    unit: g.unit,
+    priority: g.priority,
+    completedAt: g.completedAt
+  }
+})
 
 // 响应式数据
 const goals = ref([])
@@ -438,13 +478,10 @@ const pauseGoal = async (goal) => {
     await ElMessageBox.confirm('确定要暂停这个目标吗？', '确认暂停', {
       type: 'warning'
     })
-    
-    const index = goals.value.findIndex(g => g.id === goal.id)
-    if (index !== -1) {
-      goals.value[index].status = 'paused'
-      saveGoals()
-      ElMessage.success('目标已暂停')
-    }
+
+    await updateGoal(goal.id, mapGoalToBackend({ ...goal, status: 'paused' }))
+    goal.status = 'paused'
+    ElMessage.success('目标已暂停')
   } catch {
     // 用户取消
   }
@@ -455,9 +492,9 @@ const deleteGoal = async (goalId) => {
     await ElMessageBox.confirm('确定要删除这个目标吗？', '确认删除', {
       type: 'warning'
     })
-    
+
+    await apiDeleteGoal(goalId)
     goals.value = goals.value.filter(goal => goal.id !== goalId)
-    saveGoals()
     ElMessage.success('目标删除成功')
   } catch {
     // 用户取消
@@ -467,9 +504,9 @@ const deleteGoal = async (goalId) => {
 const saveGoal = async () => {
   try {
     await goalFormRef.value.validate()
-    
+
     const goalData = { ...goalForm.value }
-    
+
     // 设置日期范围
     if (goalData.type === 'daily') {
       goalData.startDate = new Date().toISOString().split('T')[0]
@@ -490,63 +527,54 @@ const saveGoal = async () => {
       goalData.startDate = goalData.dateRange[0]
       goalData.endDate = goalData.dateRange[1]
     }
-    
+
     delete goalData.dateRange
-    
-    if (editingGoal.value) {
-      // 编辑现有目标
-      const index = goals.value.findIndex(g => g.id === editingGoal.value.id)
-      if (index !== -1) {
-        goals.value[index] = {
-          ...goals.value[index],
-          ...goalData,
-          updatedAt: new Date()
-        }
-      }
-    } else {
-      // 新增目标
-      const newGoal = {
-        id: Date.now(),
-        ...goalData,
-        currentValue: 0,
-        status: 'active',
-        priority: goals.value.filter(g => g.status === 'active').length, // 设置为最低优先级
-        createdAt: new Date(),
-        updatedAt: new Date()
-      }
-      goals.value.push(newGoal)
+
+    const payload = {
+      ...goalData,
+      currentValue: editingGoal.value?.currentValue || 0,
+      status: editingGoal.value?.status || 'active',
+      priority: editingGoal.value?.priority ?? goals.value.filter(g => g.status === 'active').length
     }
-    
-    saveGoals()
+
+    if (editingGoal.value?.id) {
+      await updateGoal(editingGoal.value.id, mapGoalToBackend(payload))
+      ElMessage.success('目标更新成功')
+    } else {
+      await createGoal(mapGoalToBackend(payload))
+      ElMessage.success('目标创建成功')
+    }
+
+    await loadGoals()
     showAddGoalDialog.value = false
     editingGoal.value = null
     resetGoalForm()
-    ElMessage.success(editingGoal.value ? '目标更新成功' : '目标创建成功')
   } catch (error) {
     console.error('保存目标失败:', error)
   }
 }
 
-const saveProgress = () => {
+const saveProgress = async () => {
   if (updatingGoal.value) {
-    const index = goals.value.findIndex(g => g.id === updatingGoal.value.id)
-    if (index !== -1) {
-      goals.value[index].currentValue = progressForm.value.value
-      goals.value[index].updatedAt = new Date()
-      
-      // 检查是否完成目标
-      if (progressForm.value.value >= goals.value[index].targetValue) {
-        goals.value[index].status = 'completed'
-        goals.value[index].completedAt = new Date()
-        ElMessage.success('🎉 恭喜！目标已完成！')
-      } else {
-        ElMessage.success('进度更新成功')
-      }
-      
-      saveGoals()
+    const goal = updatingGoal.value
+    goal.currentValue = progressForm.value.value
+    goal.updatedAt = new Date()
+
+    if (progressForm.value.value >= goal.targetValue) {
+      goal.status = 'completed'
+      goal.completedAt = new Date()
+      ElMessage.success('🎉 恭喜！目标已完成！')
+    } else {
+      ElMessage.success('进度更新成功')
+    }
+
+    try {
+      await updateGoal(goal.id, mapGoalToBackend(goal))
+    } catch {
+      ElMessage.error('进度保存失败')
     }
   }
-  
+
   showProgressDialog.value = false
   updatingGoal.value = null
 }
@@ -606,46 +634,15 @@ const onDrop = (event, targetIndex) => {
   draggedIndex.value = null
 }
 
-const saveGoals = () => {
-  localStorage.setItem('writingGoals', JSON.stringify(goals.value))
-  console.log('目标数据已保存:', goals.value)
-  
-  // 触发storage事件，通知其他页面数据已更新
-  const event = new StorageEvent('storage', {
-    key: 'writingGoals',
-    newValue: JSON.stringify(goals.value),
-    oldValue: null,
-    storageArea: localStorage
-  })
-  window.dispatchEvent(event)
-  
-  // 如果首页的刷新函数存在，直接调用
-  if (window.refreshHomeData) {
-    window.refreshHomeData()
-  }
-}
+const saveGoals = () => {}
 
-const loadGoals = () => {
+const loadGoals = async () => {
   try {
-    const saved = localStorage.getItem('writingGoals')
-    if (saved) {
-      goals.value = JSON.parse(saved)
-      
-      // 兼容性处理：为没有priority字段的目标添加priority
-      let needsSave = false
-      goals.value.forEach((goal, index) => {
-        if (goal.priority === undefined) {
-          goal.priority = index
-          needsSave = true
-        }
-      })
-      
-      if (needsSave) {
-        saveGoals()
-      }
-    }
+    const backendGoals = await listGoals()
+    goals.value = backendGoals.map(mapGoalFromBackend)
   } catch (error) {
     console.error('加载目标失败:', error)
+    goals.value = []
   }
 }
 
@@ -689,8 +686,8 @@ const getRemainingDays = (endDate) => {
 }
 
 // 生命周期
-onMounted(() => {
-  loadGoals()
+onMounted(async () => {
+  await loadGoals()
 })
 </script>
 

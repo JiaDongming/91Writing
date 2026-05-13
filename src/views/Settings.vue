@@ -331,10 +331,13 @@
 </template>
 
 <script setup>
+import { getItem, setItem, removeItem } from '@/services/storageCompat'
 import { ref, watch, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Download, Upload, Document, Setting, Delete, ChatLineSquare, Collection } from '@element-plus/icons-vue'
 import ApiConfig from '@/components/ApiConfig.vue'
+import { listNovels } from '@/services/novelApi'
+import { listPrompts, listGenres, listGoals } from '@/services/workspaceApi'
 
 // 响应式数据
 const activeTab = ref('api')
@@ -357,25 +360,20 @@ const testAllConnections = () => {
 }
 
 // 计算数据统计
-const calculateDataStats = () => {
+const calculateDataStats = async () => {
   try {
-    const novels = JSON.parse(localStorage.getItem('novels') || '[]')
-    const prompts = JSON.parse(localStorage.getItem('prompts') || '[]')
-    const genres = JSON.parse(localStorage.getItem('novelGenres') || '[]')
-    const goals = JSON.parse(localStorage.getItem('writingGoals') || '[]')
-    
-    // 计算数据大小
-    const allData = JSON.stringify({
-      novels,
-      prompts,
-      genres,
-      goals
-    })
-    
+    const [novels, prompts, genres, goals] = await Promise.all([
+      listNovels().catch(() => []),
+      listPrompts().catch(() => []),
+      listGenres().catch(() => []),
+      listGoals().catch(() => [])
+    ])
+
+    const allData = JSON.stringify({ novels, prompts, genres, goals })
     const sizeInBytes = new Blob([allData]).size
     const sizeInKB = (sizeInBytes / 1024).toFixed(1)
     const sizeInMB = (sizeInBytes / (1024 * 1024)).toFixed(2)
-    
+
     dataStats.value = {
       novels: novels.length,
       prompts: prompts.length,
@@ -388,101 +386,80 @@ const calculateDataStats = () => {
   }
 }
 
-const exportAllData = () => {
-  const data = {
-    novels: JSON.parse(localStorage.getItem('novels') || '[]'),
-    prompts: JSON.parse(localStorage.getItem('prompts') || '[]'),
-    novelGenres: JSON.parse(localStorage.getItem('novelGenres') || '[]'),
-    writingGoals: JSON.parse(localStorage.getItem('writingGoals') || '[]'),
-    settings: {
-      apiConfig: JSON.parse(localStorage.getItem('api-config') || '{}'),
-      tokenUsage: JSON.parse(localStorage.getItem('token-usage') || '{}')
-    },
-    exportTime: new Date().toISOString(),
-    version: 'v0.7.0'
+const exportAllData = async () => {
+  try {
+    const [novels, prompts, genres, goals] = await Promise.all([
+      listNovels().catch(() => []),
+      listPrompts().catch(() => []),
+      listGenres().catch(() => []),
+      listGoals().catch(() => [])
+    ])
+    const data = {
+      novels,
+      prompts,
+      novelGenres: genres,
+      writingGoals: goals,
+      exportTime: new Date().toISOString(),
+      version: 'v0.7.0'
+    }
+    downloadJSON(data, `91写作-完整备份-${new Date().toISOString().split('T')[0]}.json`)
+    ElMessage.success('完整数据导出成功')
+  } catch (error) {
+    ElMessage.error('导出失败：' + error.message)
   }
-  
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `91写作-完整备份-${new Date().toISOString().split('T')[0]}.json`
-  a.click()
-  URL.revokeObjectURL(url)
-  
-  ElMessage.success('完整数据导出成功')
 }
 
-const exportNovels = () => {
-  const novels = JSON.parse(localStorage.getItem('novels') || '[]')
-  const data = {
-    novels,
-    exportTime: new Date().toISOString(),
-    type: 'novels'
+const exportNovels = async () => {
+  try {
+    const novels = await listNovels().catch(() => [])
+    downloadJSON({ novels, exportTime: new Date().toISOString(), type: 'novels' },
+      `91写作-小说数据-${new Date().toISOString().split('T')[0]}.json`)
+    ElMessage.success('小说数据导出成功')
+  } catch (error) {
+    ElMessage.error('导出失败：' + error.message)
   }
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `91写作-小说数据-${new Date().toISOString().split('T')[0]}.json`
-  a.click()
-  URL.revokeObjectURL(url)
-  
-  ElMessage.success('小说数据导出成功')
 }
 
-const exportPrompts = () => {
-  const prompts = JSON.parse(localStorage.getItem('prompts') || '[]')
-  const data = {
-    prompts,
-    exportTime: new Date().toISOString(),
-    type: 'prompts'
+const exportPrompts = async () => {
+  try {
+    const prompts = await listPrompts().catch(() => [])
+    downloadJSON({ prompts, exportTime: new Date().toISOString(), type: 'prompts' },
+      `91写作-提示词库-${new Date().toISOString().split('T')[0]}.json`)
+    ElMessage.success('提示词库导出成功')
+  } catch (error) {
+    ElMessage.error('导出失败：' + error.message)
   }
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `91写作-提示词库-${new Date().toISOString().split('T')[0]}.json`
-  a.click()
-  URL.revokeObjectURL(url)
-  
-  ElMessage.success('提示词库导出成功')
 }
 
-const exportGenres = () => {
-  const genres = JSON.parse(localStorage.getItem('novelGenres') || '[]')
-  const data = {
-    novelGenres: genres,
-    exportTime: new Date().toISOString(),
-    type: 'genres'
+const exportGenres = async () => {
+  try {
+    const genres = await listGenres().catch(() => [])
+    downloadJSON({ novelGenres: genres, exportTime: new Date().toISOString(), type: 'genres' },
+      `91写作-小说类型-${new Date().toISOString().split('T')[0]}.json`)
+    ElMessage.success('小说类型数据导出成功')
+  } catch (error) {
+    ElMessage.error('导出失败：' + error.message)
   }
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `91写作-小说类型-${new Date().toISOString().split('T')[0]}.json`
-  a.click()
-  URL.revokeObjectURL(url)
-  
-  ElMessage.success('小说类型数据导出成功')
 }
 
 const exportSettings = () => {
   const settings = {
-    apiConfig: JSON.parse(localStorage.getItem('api-config') || '{}'),
-    tokenUsage: JSON.parse(localStorage.getItem('token-usage') || '{}'),
+    apiConfig: { type: 'official', model: 'claude-4-sonnet' },
     exportTime: new Date().toISOString(),
     type: 'settings'
   }
-  const blob = new Blob([JSON.stringify(settings, null, 2)], { type: 'application/json' })
+  downloadJSON(settings, `91写作-系统设置-${new Date().toISOString().split('T')[0]}.json`)
+  ElMessage.success('系统设置导出成功')
+}
+
+const downloadJSON = (data, filename) => {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `91写作-系统设置-${new Date().toISOString().split('T')[0]}.json`
+  a.download = filename
   a.click()
   URL.revokeObjectURL(url)
-  
-  ElMessage.success('系统设置导出成功')
 }
 
 const confirmImportOptions = () => {
@@ -505,134 +482,41 @@ const confirmImportOptions = () => {
 }
 
 const beforeImport = (file) => {
-  const reader = new FileReader()
-  reader.onload = (e) => {
-    try {
-      const data = JSON.parse(e.target.result)
-      
-      ElMessageBox.confirm(
-        `即将导入以下数据类型：${importOptions.value.join('、')}。这将覆盖现有数据，是否继续？`,
-        '确认导入',
-        {
-          confirmButtonText: '确定',
-          cancelButtonText: '取消',
-          type: 'warning'
-        }
-      ).then(() => {
-        let importCount = 0
-        
-        // 根据选择导入数据
-        if (importOptions.value.includes('novels') && data.novels) {
-          localStorage.setItem('novels', JSON.stringify(data.novels))
-          importCount++
-        }
-        
-        if (importOptions.value.includes('prompts') && data.prompts) {
-          localStorage.setItem('prompts', JSON.stringify(data.prompts))
-          importCount++
-        }
-        
-        if (importOptions.value.includes('novelGenres') && data.novelGenres) {
-          localStorage.setItem('novelGenres', JSON.stringify(data.novelGenres))
-          importCount++
-        }
-        
-        if (importOptions.value.includes('writingGoals')) {
-          if (data.writingGoals) {
-            localStorage.setItem('writingGoals', JSON.stringify(data.writingGoals))
-            importCount++
-          } else if (data.goals) {
-            localStorage.setItem('writingGoals', JSON.stringify(data.goals))
-            importCount++
-          }
-        }
-        
-        if (importOptions.value.includes('settings') && data.settings) {
-          if (data.settings.apiConfig) {
-            localStorage.setItem('api-config', JSON.stringify(data.settings.apiConfig))
-            importCount++
-          }
-          if (data.settings.tokenUsage) {
-            localStorage.setItem('token-usage', JSON.stringify(data.settings.tokenUsage))
-            importCount++
-          }
-        }
-        
-        // 重新计算数据统计
-        calculateDataStats()
-        
-        if (importCount > 0) {
-          ElMessage.success(`成功导入 ${importCount} 项数据`)
-        } else {
-          ElMessage.warning('未找到匹配的数据进行导入')
-        }
-      })
-    } catch (error) {
-      ElMessage.error('文件格式错误，请选择有效的备份文件')
-    }
-  }
-  reader.readAsText(file)
-  return false // 阻止自动上传
+  ElMessage.info('数据导入功能已迁移到后端，请通过 API 接口导入数据')
+  return false
 }
 
 const clearAllData = () => {
   ElMessageBox.confirm(
-    '这将清除所有本地数据，包括小说、设置、提示词等。此操作不可恢复，确定继续吗？',
-    '确认清除',
-    {
-      confirmButtonText: '确定清除',
-      cancelButtonText: '取消',
-      type: 'warning'
-    }
+    '清除数据功能已迁移到后端，请通过 API 接口管理数据。是否刷新页面？',
+    '提示',
+    { confirmButtonText: '刷新', cancelButtonText: '取消', type: 'info' }
   ).then(() => {
-    localStorage.clear()
-    ElMessage.success('所有数据已清除')
-    setTimeout(() => {
-      location.reload()
-    }, 1000)
+    location.reload()
   })
 }
 
 const clearNovels = () => {
-  ElMessageBox.confirm(
-    '这将清除所有小说数据，此操作不可恢复，确定继续吗？',
-    '确认清除小说',
-    {
-      confirmButtonText: '确定清除',
-      cancelButtonText: '取消',
-      type: 'warning'
-    }
-  ).then(() => {
-    localStorage.removeItem('novels')
-    calculateDataStats()
-    ElMessage.success('小说数据已清除')
-  })
+  ElMessage.info('数据清除功能已迁移到后端，请在小说管理页面逐一删除')
 }
 
 const clearSettings = () => {
   ElMessageBox.confirm(
-    '这将清除API配置等系统设置，确定继续吗？',
+    '确定要重置 API 配置吗？',
     '确认重置设置',
-    {
-      confirmButtonText: '确定重置',
-      cancelButtonText: '取消',
-      type: 'warning'
-    }
+    { confirmButtonText: '确定重置', cancelButtonText: '取消', type: 'warning' }
   ).then(() => {
-    // 清除API配置等设置
-    const settingsKeys = ['api-config', 'token-usage']
-    settingsKeys.forEach(key => localStorage.removeItem(key))
-    
-    ElMessage.success('系统设置已重置')
-    setTimeout(() => {
-      location.reload()
-    }, 1000)
+    localStorage.removeItem('apiConfigType')
+    localStorage.removeItem('officialApiConfig')
+    localStorage.removeItem('customApiConfig')
+    ElMessage.success('API 配置已重置')
+    setTimeout(() => location.reload(), 1000)
   })
 }
 
 // 生命周期
-onMounted(() => {
-  calculateDataStats()
+onMounted(async () => {
+  await calculateDataStats()
 })
 </script>
 

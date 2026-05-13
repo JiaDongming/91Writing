@@ -239,6 +239,9 @@
 </template>
 
 <script setup>
+import { getItem, setItem, removeItem } from '@/services/storageCompat'
+import { listNovels, getNovel } from '@/services/novelApi'
+import { listPrompts } from '@/services/workspaceApi'
 import { ref, reactive, computed, nextTick, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick, Refresh, CopyDocument, DocumentAdd } from '@element-plus/icons-vue'
@@ -263,33 +266,22 @@ const availablePrompts = ref([])
 const selectedPromptData = ref(null)
 
 // 加载小说列表
-const loadNovelList = () => {
+const originalNovels = ref([])
+
+const loadNovelList = async () => {
   try {
-    const savedNovels = JSON.parse(localStorage.getItem('novels') || '[]')
-    console.log('原始小说数据:', savedNovels) // 调试用
-    
-    if (!Array.isArray(savedNovels)) {
-      console.warn('小说数据不是数组格式')
-      novelList.value = []
-      return
-    }
-    
-    novelList.value = savedNovels.map(novel => {
-      if (!novel || typeof novel !== 'object') {
-        return null
-      }
-      
-      return {
-        value: novel.id || `novel_${Date.now()}_${Math.random()}`,
-        label: novel.title || '未命名小说',
-        chapters: Array.isArray(novel.chapterList) ? novel.chapterList : (Array.isArray(novel.chapters) ? novel.chapters : [])
-      }
-    }).filter(novel => novel !== null) // 过滤掉无效的小说
-    
-    console.log('处理后的小说列表:', novelList.value) // 调试用
+    const novels = await listNovels()
+    originalNovels.value = novels
+
+    novelList.value = novels.map(novel => ({
+      value: novel.id,
+      label: novel.title || '未命名小说',
+      chapters: []
+    }))
   } catch (error) {
     console.error('加载小说列表失败:', error)
     novelList.value = []
+    originalNovels.value = []
   }
 }
 
@@ -610,7 +602,7 @@ const generateContent = async () => {
   
   try {
     // 构建提示词
-    const prompt = buildPrompt()
+    const prompt = await buildPrompt()
     console.log('工具生成提示词:', prompt)
     
     // 开始进度模拟
@@ -679,20 +671,22 @@ const updateStatusText = () => {
   }
 }
 
-const buildPrompt = () => {
+const buildPrompt = async () => {
   const tool = currentTool.value
   let prompt = ''
   let useTemplate = selectedPromptData.value && selectedPromptData.value.content
-  
+
   // 首先构建小说信息部分（如果工具支持小说选择器）
   let novelInfoSection = ''
+  let originalNovel = null
   if (tool.hasNovelSelector && toolForm.selectedNovel) {
     const selectedNovel = novelList.value.find(novel => novel.value === toolForm.selectedNovel)
     if (selectedNovel) {
-      // 获取完整的小说数据
-      const originalNovels = JSON.parse(localStorage.getItem('novels') || '[]')
-      const originalNovel = originalNovels.find(n => n.id == selectedNovel.value || n.title === selectedNovel.label)
-      
+      // 获取完整的小说数据（含角色、世界观等嵌套信息）
+      try {
+        originalNovel = await getNovel(selectedNovel.value)
+      } catch { /* use basic info if fetch fails */ }
+
       novelInfoSection += `=== 目标小说信息 ===\n`
       novelInfoSection += `小说标题：${selectedNovel.label}\n`
       
@@ -701,8 +695,8 @@ const buildPrompt = () => {
         if (originalNovel.genre) {
           novelInfoSection += `小说类型：${originalNovel.genre}\n`
         }
-        if (originalNovel.description) {
-          novelInfoSection += `小说简介：${originalNovel.description}\n`
+        if (originalNovel.intro) {
+          novelInfoSection += `小说简介：${originalNovel.intro}\n`
         }
         if (originalNovel.tags && Array.isArray(originalNovel.tags)) {
           novelInfoSection += `标签：${originalNovel.tags.join('、')}\n`
@@ -713,7 +707,7 @@ const buildPrompt = () => {
           novelInfoSection += `\n=== 主要角色 ===\n`
           originalNovel.characters.forEach(char => {
             if (char.name) {
-              novelInfoSection += `${char.name}：${char.description || char.personality || '主要角色'}\n`
+              novelInfoSection += `${char.name}：${char.description || (char.traits && char.traits.join('、')) || '主要角色'}\n`
             }
           })
         }
@@ -763,20 +757,17 @@ const buildPrompt = () => {
     if (tool.hasNovelSelector && toolForm.selectedNovel) {
       const selectedNovel = novelList.value.find(novel => novel.value === toolForm.selectedNovel)
       if (selectedNovel) {
-        const originalNovels = JSON.parse(localStorage.getItem('novels') || '[]')
-        const originalNovel = originalNovels.find(n => n.id == selectedNovel.value || n.title === selectedNovel.label)
-        
         // 替换小说相关变量
         prompt = prompt.replace(/\{小说标题\}/g, selectedNovel.label)
         if (originalNovel) {
           prompt = prompt.replace(/\{小说类型\}/g, originalNovel.genre || '未设定')
-          prompt = prompt.replace(/\{小说简介\}/g, originalNovel.description || '无简介')
+          prompt = prompt.replace(/\{小说简介\}/g, originalNovel.intro || '无简介')
           prompt = prompt.replace(/\{标签\}/g, originalNovel.tags ? originalNovel.tags.join('、') : '无标签')
           
           // 替换角色信息
           if (originalNovel.characters && Array.isArray(originalNovel.characters) && originalNovel.characters.length > 0) {
             const charactersInfo = originalNovel.characters.map(char => 
-              `${char.name}：${char.description || char.personality || '主要角色'}`
+              `${char.name}：${char.description || (char.traits && char.traits.join('、')) || '主要角色'}`
             ).join('\n')
             prompt = prompt.replace(/\{主要人物\}/g, charactersInfo)
           } else {
@@ -974,15 +965,17 @@ ${generatedContent.value}
 
 
 // 加载提示词数据
-const loadPrompts = () => {
+const loadPrompts = async () => {
   try {
-    const savedPrompts = localStorage.getItem('prompts')
-    if (savedPrompts) {
-      availablePrompts.value = JSON.parse(savedPrompts)
-    } else {
-      availablePrompts.value = []
-    }
-    console.log('加载提示词数据:', availablePrompts.value.length)
+    const backendPrompts = await listPrompts()
+    availablePrompts.value = backendPrompts.map(p => ({
+      id: p.id,
+      title: p.title,
+      category: p.category,
+      content: p.content,
+      description: p.variables?.description || '',
+      tags: p.variables?.tags || []
+    }))
   } catch (error) {
     console.error('加载提示词失败:', error)
     availablePrompts.value = []
@@ -1024,9 +1017,9 @@ const validateCharacterCount = (field, value) => {
 }
 
 // 组件挂载时加载小说列表和提示词
-onMounted(() => {
-  loadNovelList()
-  loadPrompts()
+onMounted(async () => {
+  await loadNovelList()
+  await loadPrompts()
 })
 </script>
 

@@ -266,6 +266,7 @@
 </template>
 
 <script setup>
+import { getItem, setItem, removeItem } from '@/services/storageCompat'
 import { ref, computed, onMounted } from 'vue'
 import { useNovelStore } from '@/stores/novel'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -273,6 +274,8 @@ import {
   FolderAdd, Upload, Files, Clock, Coin, Setting, Search, Delete,
   Document, RefreshRight, Download, View
 } from '@element-plus/icons-vue'
+import { listNovels, getNovel } from '@/services/novelApi'
+import { listGoals } from '@/services/workspaceApi'
 
 const novelStore = useNovelStore()
 
@@ -338,56 +341,53 @@ const confirmCreateBackup = async () => {
     await backupFormRef.value.validate()
     creating.value = true
     
-    // 收集要备份的数据
     const backupData = {}
     const contentList = []
-    
+
     if (backupForm.value.content.includes('novel')) {
-      backupData.novel = novelStore.currentNovel
-      contentList.push({ key: 'novel', name: '小说内容', size: new Blob([novelStore.currentNovel || '']).size })
+      try {
+        const novels = await listNovels()
+        backupData.novels = novels
+        contentList.push({ key: 'novels', name: '小说列表', size: new Blob([JSON.stringify(novels)]).size })
+      } catch { /* skip */ }
     }
-    
-    if (backupForm.value.content.includes('chapters')) {
-      const chapters = JSON.parse(localStorage.getItem('novel_chapters') || '[]')
-      backupData.chapters = chapters
-      contentList.push({ key: 'chapters', name: '章节管理', size: new Blob([JSON.stringify(chapters)]).size })
-    }
-    
+
     if (backupForm.value.content.includes('templates')) {
       backupData.templates = novelStore.templates
       contentList.push({ key: 'templates', name: '模板数据', size: new Blob([JSON.stringify(novelStore.templates)]).size })
     }
-    
+
     if (backupForm.value.content.includes('corpus')) {
       backupData.corpus = novelStore.corpus
       contentList.push({ key: 'corpus', name: '语料库', size: new Blob([JSON.stringify(novelStore.corpus)]).size })
     }
-    
+
     if (backupForm.value.content.includes('characters')) {
       backupData.characters = novelStore.characters
       contentList.push({ key: 'characters', name: '角色设定', size: new Blob([JSON.stringify(novelStore.characters)]).size })
     }
-    
+
     if (backupForm.value.content.includes('worldSettings')) {
       backupData.worldSettings = novelStore.worldSettings
       contentList.push({ key: 'worldSettings', name: '世界观设定', size: new Blob([JSON.stringify(novelStore.worldSettings)]).size })
     }
-    
+
     if (backupForm.value.content.includes('goals')) {
-      const goals = JSON.parse(localStorage.getItem('writingGoals') || '[]')
-      backupData.goals = goals
-      contentList.push({ key: 'goals', name: '写作目标', size: new Blob([JSON.stringify(goals)]).size })
+      try {
+        const goals = await listGoals()
+        backupData.goals = goals
+        contentList.push({ key: 'goals', name: '写作目标', size: new Blob([JSON.stringify(goals)]).size })
+      } catch { /* skip */ }
     }
-    
+
     if (backupForm.value.content.includes('settings')) {
       const settings = {
-        apiConfig: novelStore.apiConfig,
         autoBackupSettings: { autoBackupEnabled: autoBackupEnabled.value, autoBackupFrequency: autoBackupFrequency.value, maxBackupCount: maxBackupCount.value }
       }
       backupData.settings = settings
       contentList.push({ key: 'settings', name: '应用设置', size: new Blob([JSON.stringify(settings)]).size })
     }
-    
+
     // 创建备份记录
     const backup = {
       id: Date.now(),
@@ -421,50 +421,32 @@ const restoreBackup = async (backup) => {
       '确认恢复',
       { type: 'warning' }
     )
-    
+
     const data = backup.data
-    
-    // 恢复各种数据
-    if (data.novel) {
-      novelStore.setCurrentNovel(data.novel)
-    }
-    
-    if (data.chapters) {
-      localStorage.setItem('novel_chapters', JSON.stringify(data.chapters))
-    }
-    
+
     if (data.templates) {
       novelStore.templates = data.templates
     }
-    
+
     if (data.corpus) {
       novelStore.corpus = data.corpus
     }
-    
+
     if (data.characters) {
       novelStore.characters = data.characters
     }
-    
+
     if (data.worldSettings) {
       novelStore.worldSettings = data.worldSettings
     }
-    
-    if (data.goals) {
-      localStorage.setItem('writingGoals', JSON.stringify(data.goals))
+
+    if (data.settings?.autoBackupSettings) {
+      autoBackupEnabled.value = data.settings.autoBackupSettings.autoBackupEnabled
+      autoBackupFrequency.value = data.settings.autoBackupFrequency
+      maxBackupCount.value = data.settings.autoBackupSettings.maxBackupCount
     }
-    
-    if (data.settings) {
-      if (data.settings.apiConfig) {
-        Object.assign(novelStore.apiConfig, data.settings.apiConfig)
-      }
-      if (data.settings.autoBackupSettings) {
-        autoBackupEnabled.value = data.settings.autoBackupSettings.autoBackupEnabled
-        autoBackupFrequency.value = data.settings.autoBackupSettings.autoBackupFrequency
-        maxBackupCount.value = data.settings.autoBackupSettings.maxBackupCount
-      }
-    }
-    
-    ElMessage.success('备份恢复成功')
+
+    ElMessage.success('备份恢复成功（小说、章节、目标等数据请通过后端 API 恢复）')
   } catch {
     // 用户取消
   }
@@ -575,12 +557,12 @@ const saveAutoBackupSettings = () => {
     autoBackupFrequency: autoBackupFrequency.value,
     maxBackupCount: maxBackupCount.value
   }
-  localStorage.setItem('auto_backup_settings', JSON.stringify(settings))
+  setItem('auto_backup_settings', JSON.stringify(settings))
 }
 
 const loadAutoBackupSettings = () => {
   try {
-    const saved = localStorage.getItem('auto_backup_settings')
+    const saved = getItem('auto_backup_settings')
     if (saved) {
       const settings = JSON.parse(saved)
       autoBackupEnabled.value = settings.autoBackupEnabled || false
@@ -606,12 +588,12 @@ const saveBackups = () => {
     ...backup,
     data: undefined // 移除数据部分
   }))
-  localStorage.setItem('backup_list', JSON.stringify(backupMeta))
+  setItem('backup_list', JSON.stringify(backupMeta))
 }
 
 const loadBackups = () => {
   try {
-    const saved = localStorage.getItem('backup_list')
+    const saved = getItem('backup_list')
     if (saved) {
       backups.value = JSON.parse(saved)
     }

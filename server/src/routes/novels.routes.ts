@@ -187,6 +187,25 @@ router.delete(
   },
 );
 
+router.get(
+  "/:novelId/chapters",
+  async (request: AuthenticatedRequest, response: Response) => {
+    const novelId = routeParam(request.params.novelId);
+    const novel = await findOwnedNovel(novelId, request.auth!.userId);
+
+    if (!novel) {
+      return response.status(404).json({ message: "小说不存在" });
+    }
+
+    const chapters = await prisma.chapter.findMany({
+      where: { novelId: novel.id },
+      orderBy: { sortOrder: "asc" },
+    });
+
+    response.json(chapters);
+  },
+);
+
 router.post(
   "/:novelId/chapters",
   async (request: AuthenticatedRequest, response: Response) => {
