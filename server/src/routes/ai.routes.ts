@@ -47,7 +47,8 @@ router.post(
       const model = input.model || env.OPENAI_MODEL;
       const operationType = input.operationType || "chat_completion";
 
-      await assertTokenQuota(request.auth!.userId, input.max_tokens ?? 4000);
+      const estimatedTokens = input.messages.reduce((sum, m) => sum + m.content.length, 0);
+      await assertTokenQuota(request.auth!.userId, Math.min(estimatedTokens, 8000));
 
       const client = getOpenAIClient();
 

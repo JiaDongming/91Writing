@@ -591,7 +591,7 @@ const addNewConfig = () => {
     apiKey: '',
     model: '',
     temperature: 0.7,
-    maxTokens: 2000000, // 默认最大Token数
+    maxTokens: 4096, // 默认最大Token数
     unlimitedTokens: false, // 默认不无限制
     topP: 1.0,
     frequencyPenalty: 0.0,
@@ -650,13 +650,13 @@ const testAllConnections = async () => {
   }
 }
 
-const saveConfig = (config) => {
+const saveConfig = async (config) => {
   // 验证必填字段
   if (!config.name || !config.apiUrl) {
     ElMessage.warning('请填写配置名称和API地址')
     return
   }
-  
+
   // 如果设为默认，取消其他默认配置
   if (config.isDefault) {
     apiConfigs.value.forEach(c => {
@@ -665,8 +665,29 @@ const saveConfig = (config) => {
       }
     })
   }
-  
-  ElMessage.success(`${config.name} 配置已保存`)
+
+  try {
+    const payload = {
+      provider: config.type === 'openai' ? 'OPENAI' : 'CUSTOM',
+      name: config.name,
+      baseUrl: config.apiUrl || null,
+      apiKey: config.apiKey || null,
+      model: config.model || null,
+      isDefault: config.isDefault || false,
+      isEnabled: config.enabled !== false
+    }
+
+    if (config._isNew) {
+      const created = await createProvider(payload)
+      config.id = created.id
+      config._isNew = false
+    } else {
+      await updateProvider(config.id, payload)
+    }
+    ElMessage.success(`${config.name} 配置已保存`)
+  } catch (error) {
+    ElMessage.error('保存失败：' + (error.response?.data?.message || error.message))
+  }
 }
 
 const saveAllConfigs = async () => {

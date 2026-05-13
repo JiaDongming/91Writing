@@ -336,7 +336,7 @@ const officialForm = reactive({
   apiKey: '',
   baseURL: 'https://ai.91hub.vip/v1',
   selectedModel: 'claude-4-sonnet',
-  maxTokens: 2000000,
+  maxTokens: 4096,
   unlimitedTokens: false,
   temperature: 0.7
 })
@@ -346,7 +346,7 @@ const customForm = reactive({
   apiKey: '',
   baseURL: 'https://api.openai.com/v1',
   selectedModel: 'gpt-3.5-turbo',
-  maxTokens: 2000000,
+  maxTokens: 4096,
   unlimitedTokens: false,
   temperature: 0.7
 })
@@ -561,7 +561,7 @@ const resetCustomConfig = () => {
     apiKey: '',
     baseURL: 'https://api.openai.com/v1',
     selectedModel: 'gpt-3.5-turbo',
-    maxTokens: 2000000,
+    maxTokens: 4096,
     unlimitedTokens: false,
     temperature: 0.7
   })

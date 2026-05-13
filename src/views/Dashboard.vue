@@ -414,7 +414,7 @@ const handleModelChange = (modelId) => {
         // 如果没有保存的官方配置，使用默认值
         newConfig = {
           baseURL: 'https://ai.91hub.vip/v1',
-          maxTokens: 2000000,
+          maxTokens: 4096,
           unlimitedTokens: false,
           temperature: 0.7,
           apiKey: '' // 需要用户配置
@@ -440,7 +440,7 @@ const handleModelChange = (modelId) => {
         // 如果没有保存的自定义配置，使用默认值
         newConfig = {
           baseURL: 'https://api.openai.com/v1',
-          maxTokens: 2000000,
+          maxTokens: 4096,
           unlimitedTokens: false,
           temperature: 0.7,
           apiKey: '' // 需要用户配置

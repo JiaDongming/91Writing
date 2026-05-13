@@ -5,14 +5,16 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "server:dev": "npm --prefix server run dev",
-    "server:build": "npm --prefix server run build",
-    "server:prisma:generate": "npm --prefix server run prisma:generate",
-    "server:prisma:push": "npm --prefix server run prisma:push",
-    "server:prisma:seed": "npm --prefix server run prisma:seed",
+    "dev:all": "concurrently -n server,app -c blue,green \"npm --prefix server run dev\" \"vite\"",
     "build": "vite build",
     "preview": "vite preview",
-    "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix --ignore-path .gitignore"
+    "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix --ignore-path .gitignore",
+    "server:dev": "npm --prefix server run dev",
+    "server:build": "npm --prefix server run build",
+    "db:setup": "npm --prefix server run prisma:generate && npm --prefix server run prisma:push && npm --prefix server run prisma:seed",
+    "db:push": "npm --prefix server run prisma:push",
+    "db:seed": "npm --prefix server run prisma:seed",
+    "db:studio": "npm --prefix server run prisma:studio"
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.1.0",
@@ -31,6 +33,7 @@
   "devDependencies": {
     "@vitejs/plugin-vue": "^4.4.1",
     "@vue/eslint-config-prettier": "^8.0.0",
+    "concurrently": "^9.2.1",
     "eslint": "^8.53.0",
     "eslint-plugin-vue": "^9.18.1",
     "prettier": "^3.1.0",
