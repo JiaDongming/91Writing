@@ -7705,6 +7705,7 @@ const initNovel = async () => {
     if (novel.chapters && novel.chapters.length > 0) {
       chapters.value = novel.chapters.map(chapter => ({
         ...chapter,
+        description: chapter.outlineContent || '',
         createdAt: new Date(chapter.createdAt),
         updatedAt: new Date(chapter.updatedAt),
         status: chapter.status || 'draft'

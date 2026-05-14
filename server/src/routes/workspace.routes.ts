@@ -81,7 +81,10 @@ router.get(
   async (request: AuthenticatedRequest, response: Response) => {
     const prompts = await prisma.promptTemplate.findMany({
       where: {
-        userId: request.auth!.userId,
+        OR: [
+          { userId: request.auth!.userId },
+          { isSystem: true }
+        ]
       },
       orderBy: {
         updatedAt: "desc",

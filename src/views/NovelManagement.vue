@@ -548,7 +548,7 @@ import {
 } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 import apiService from '@/services/api.js'
-import { listNovels, createNovel as apiCreateNovel, updateNovel as apiUpdateNovel, deleteNovel as apiDeleteNovel } from '@/services/novelApi'
+import { listNovels, getNovel, createNovel as apiCreateNovel, updateNovel as apiUpdateNovel, deleteNovel as apiDeleteNovel } from '@/services/novelApi'
 import { listGenres as apiListGenres } from '@/services/workspaceApi'
 
 const router = useRouter()
@@ -816,8 +816,28 @@ const openNovel = async (novel) => {
 }
 
 const viewNovelDetails = async (novel) => {
-  selectedNovel.value = novel
   showDetailsDialog.value = true
+  try {
+    const detail = await getNovel(novel.id)
+    selectedNovel.value = {
+      ...detail,
+      chapters: detail._count?.chapters || detail.chapters?.length || 0,
+      chapterList: detail.chapters || [],
+      characters: detail.characters || [],
+      worldSettings: detail.worldSettings || [],
+      storyEvents: detail.storyEvents || []
+    }
+  } catch {
+    // 降级：如果详情接口失败，用列表数据展示
+    selectedNovel.value = {
+      ...novel,
+      chapters: novel._count?.chapters || 0,
+      chapterList: novel.chapters || [],
+      characters: novel.characters || [],
+      worldSettings: novel.worldSettings || [],
+      storyEvents: novel.storyEvents || []
+    }
+  }
 }
 
 const exportNovel = async (novel) => {
