@@ -26,6 +26,7 @@ const novelSchema = z.object({
   theme: z.string().optional().nullable(),
   tags: z.array(z.string()).optional(),
   status: novelStatusEnum.optional(),
+  wordCount: z.number().int().nonnegative().optional(),
 });
 
 const chapterSchema = z.object({
@@ -62,6 +63,17 @@ const storyEventSchema = z.object({
   metadata: z.any().optional(),
 });
 
+async function syncNovelWordCount(novelId: string) {
+  const result = await prisma.chapter.aggregate({
+    where: { novelId },
+    _sum: { wordCount: true },
+  })
+  await prisma.novel.update({
+    where: { id: novelId },
+    data: { wordCount: result._sum.wordCount ?? 0 },
+  })
+}
+
 async function findOwnedNovel(novelId: string, userId: string) {
   return prisma.novel.findFirst({
     where: {
@@ -92,7 +104,23 @@ router.get("/", async (request: AuthenticatedRequest, response: Response) => {
     },
   });
 
-  response.json(novels);
+  // 从章节表实时汇总每本小说的总字数
+  const novelIds = novels.map(n => n.id);
+  const chapterAggs = await prisma.chapter.groupBy({
+    by: ['novelId'],
+    where: { novelId: { in: novelIds } },
+    _sum: { wordCount: true },
+  });
+  const wordCountMap = new Map(
+    chapterAggs.map(row => [row.novelId, row._sum.wordCount ?? 0])
+  );
+
+  response.json(
+    novels.map(n => ({
+      ...n,
+      wordCount: wordCountMap.get(n.id) ?? 0,
+    }))
+  );
 });
 
 router.post("/", async (request: AuthenticatedRequest, response: Response) => {
@@ -141,7 +169,11 @@ router.get(
       return response.status(404).json({ message: "小说不存在" });
     }
 
-    response.json(novel);
+    const totalWordCount = novel.chapters.reduce(
+      (sum, ch) => sum + (ch.wordCount || 0), 0
+    );
+
+    response.json({ ...novel, wordCount: totalWordCount });
   },
 );
 
@@ -233,6 +265,7 @@ router.post(
       });
 
       response.status(201).json(chapter);
+      await syncNovelWordCount(novel.id);
     } catch (error) {
       const message = error instanceof Error ? error.message : "创建章节失败";
       response.status(400).json({ message });
@@ -278,6 +311,7 @@ router.put(
       });
 
       response.json(chapter);
+      await syncNovelWordCount(existingChapter.novelId);
     } catch (error) {
       const message = error instanceof Error ? error.message : "更新章节失败";
       response.status(400).json({ message });
@@ -289,15 +323,23 @@ router.delete(
   "/chapters/:chapterId",
   async (request: AuthenticatedRequest, response: Response) => {
     const chapterId = routeParam(request.params.chapterId);
-    await prisma.chapter.deleteMany({
+    const chapter = await prisma.chapter.findFirst({
       where: {
         id: chapterId,
-        novel: {
-          userId: request.auth!.userId,
-        },
+        novel: { userId: request.auth!.userId },
       },
+      select: { novelId: true },
     });
 
+    if (!chapter) {
+      return response.status(404).json({ message: "章节不存在" });
+    }
+
+    await prisma.chapter.delete({
+      where: { id: chapterId },
+    });
+
+    await syncNovelWordCount(chapter.novelId);
     response.status(204).send();
   },
 );

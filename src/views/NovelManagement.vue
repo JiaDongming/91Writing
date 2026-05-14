@@ -101,7 +101,7 @@
             <div class="novel-meta">
               <div class="meta-item">
                 <el-icon><Document /></el-icon>
-                <span>{{ (novel.chapterList || []).length }}章</span>
+                <span>{{ novel.chapters }}章</span>
               </div>
               <div class="meta-item">
                 <el-icon><EditPen /></el-icon>
@@ -681,20 +681,22 @@ const filteredNovels = computed(() => {
 // 方法
 const getStatusType = (status) => {
   const types = {
-    writing: 'success',
-    completed: 'info',
-    paused: 'warning'
+    DRAFT: '',
+    SERIALIZING: 'success',
+    COMPLETED: 'info',
+    ARCHIVED: 'warning'
   }
-  return types[status] || 'info'
+  return types[status] || ''
 }
 
 const getStatusText = (status) => {
   const texts = {
-    writing: '创作中',
-    completed: '已完成',
-    paused: '已暂停'
+    DRAFT: '草稿',
+    SERIALIZING: '连载中',
+    COMPLETED: '已完成',
+    ARCHIVED: '已归档'
   }
-  return texts[status] || '未知'
+  return texts[status] || status || '未知'
 }
 
 const getGenreDisplayName = (genreCode) => {

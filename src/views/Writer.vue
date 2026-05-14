@@ -8596,7 +8596,7 @@ watch(() => aiSingleChapterForm.value, () => {
 }, { deep: true })
 
 const selectPromptForOptimize = () => {
-  selectedPromptCategory.value = 'optimize'
+  selectedPromptCategory.value = 'polish'
   showPromptDialog.value = true
 }
 
