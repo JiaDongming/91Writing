@@ -381,17 +381,18 @@
                 <h3 class="chapter-title">✍️ {{ currentChapter.title }}</h3>
                 <div class="chapter-meta">
                   <span class="word-count">{{ contentWordCount }}字</span>
-                  <el-select 
-                    v-if="currentChapter.status" 
-                    v-model="currentChapter.status" 
-                    size="small" 
-                    style="width: 80px;"
+                  <el-select
+                    v-if="currentChapter.status"
+                    v-model="currentChapter.status"
+                    size="small"
+                    style="width: 90px;"
                     @change="updateChapterStatus"
                     popper-class="chapter-status-dropdown"
                   >
-                    <el-option label="草稿" value="draft" />
-                    <el-option label="完成" value="completed" />
-                    <el-option label="发表" value="published" />
+                    <el-option label="草稿" value="DRAFT" />
+                    <el-option label="已生成" value="GENERATED" />
+                    <el-option label="已审核" value="REVIEWED" />
+                    <el-option label="已发表" value="PUBLISHED" />
                   </el-select>
                   <span v-if="isSaving" class="saving-indicator">● 保存中...</span>
                 </div>
@@ -479,9 +480,10 @@
         </el-form-item>
         <el-form-item label="章节状态">
           <el-select v-model="chapterForm.status">
-            <el-option label="草稿" value="draft" />
-            <el-option label="完成" value="completed" />
-            <el-option label="发表" value="published" />
+            <el-option label="草稿" value="DRAFT" />
+            <el-option label="已生成" value="GENERATED" />
+            <el-option label="已审核" value="REVIEWED" />
+            <el-option label="已发表" value="PUBLISHED" />
           </el-select>
         </el-form-item>
       </el-form>
@@ -2442,21 +2444,17 @@ const selectChapter = (chapter) => {
 }
 
 const loadChapter = (chapter) => {
-  // 确保章节有正确的状态字段，如果没有则设置为草稿
-  if (!chapter.status || chapter.status === 'outline') {
-    chapter.status = 'draft'
-  }
   currentChapter.value = chapter
   content.value = chapter.content || ''
 }
 
-const saveCurrentChapter = () => {
+const saveCurrentChapter = async () => {
   if (currentChapter.value) {
     currentChapter.value.content = content.value
     currentChapter.value.wordCount = contentWordCount.value
     currentChapter.value.updatedAt = new Date()
     try {
-      updateChapter(currentChapter.value.id, {
+      await updateChapter(currentChapter.value.id, {
         content: content.value,
         wordCount: contentWordCount.value
       })
@@ -2470,7 +2468,7 @@ const addNewChapter = () => {
   chapterForm.value = {
     title: '',
     description: '',
-    status: 'draft'
+    status: 'DRAFT'
   }
   showChapterDialog.value = true
 }
@@ -2480,7 +2478,7 @@ const editChapterTitle = (chapter) => {
   chapterForm.value = {
     title: chapter.title,
     description: chapter.description || '',
-    status: chapter.status || 'draft'
+    status: chapter.status || 'DRAFT'
   }
   showChapterDialog.value = true
 }
@@ -2500,7 +2498,7 @@ const saveChapter = async () => {
       await updateChapter(editingChapter.value.id, {
         title: chapterForm.value.title,
         outlineContent: chapterForm.value.description,
-        status: chapterForm.value.status === 'draft' ? 'DRAFT' : 'GENERATED'
+        status: chapterForm.value.status
       })
     } catch (e) { console.error('更新章节失败:', e) }
     ElMessage.success('章节信息已更新')
@@ -2525,7 +2523,7 @@ const saveChapter = async () => {
         wordCount: created.wordCount || 0,
         createdAt: new Date(created.createdAt),
         updatedAt: new Date(created.updatedAt),
-        status: (created.status || 'DRAFT').toLowerCase()
+        status: created.status || 'DRAFT'
       }
       chapters.value.push(newChapter)
       ElMessage.success('章节创建成功')
@@ -2612,20 +2610,22 @@ const handleChapterAction = (command, chapter) => {
 
 const getChapterStatusType = (status) => {
   const statusMap = {
-    draft: 'warning',
-    completed: 'success',
-    published: 'primary'
+    DRAFT: 'info',
+    GENERATED: 'warning',
+    REVIEWED: 'success',
+    PUBLISHED: ''
   }
-  return statusMap[status] || 'warning'
+  return statusMap[status] || 'info'
 }
 
 const getChapterStatusText = (status) => {
   const statusMap = {
-    draft: '草稿',
-    completed: '完成',
-    published: '发表'
+    DRAFT: '草稿',
+    GENERATED: '已生成',
+    REVIEWED: '已审核',
+    PUBLISHED: '已发表'
   }
-  return statusMap[status] || '草稿'
+  return statusMap[status] || status || '草稿'
 }
 
 // AI生成相关方法
@@ -2719,20 +2719,33 @@ ${getRecentChaptersDetail()}
     // 记录是否是第一次生成章节
     const wasEmpty = chapters.value.length === 0
     
-    // 添加到章节列表
-    newChapters.forEach((chapterData, index) => {
-      const newChapter = {
-        id: Date.now() + index,
-        title: chapterData.title || `AI生成章节 ${chapters.value.length + index + 1}`,
-        description: chapterData.description || chapterData.outline || '暂无描述',
-        content: '',
-        wordCount: 0,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        status: 'draft'
+    // 保存到后端数据库
+    for (const chapterData of newChapters) {
+      try {
+        const sortOrder = chapters.value.length + 1
+        const created = await createChapter(currentNovel.value.id, {
+          title: chapterData.title || `AI生成章节 ${chapters.value.length + 1}`,
+          content: '',
+          outlineContent: chapterData.description || chapterData.outline || '暂无描述',
+          wordCount: 0,
+          sortOrder,
+          status: 'DRAFT'
+        })
+        chapters.value.push({
+          ...created,
+          id: created.id,
+          title: created.title,
+          description: created.outlineContent || '',
+          content: created.content || '',
+          wordCount: created.wordCount || 0,
+          createdAt: new Date(created.createdAt),
+          updatedAt: new Date(created.updatedAt),
+          status: created.status || 'DRAFT'
+        })
+      } catch (e) {
+        console.error('保存章节到数据库失败:', e)
       }
-      chapters.value.push(newChapter)
-    })
+    }
     
     // 如果之前没有章节，自动选择第一个生成的章节
     if (wasEmpty && chapters.value.length > 0) {
@@ -6560,19 +6573,16 @@ const replaceFullContent = () => {
       cancelButtonText: '取消',
       type: 'warning'
     }
-  ).then(() => {
+  ).then(async () => {
     // 替换全文内容
     const formattedContent = formatGeneratedContent(optimizeForm.value.optimizedContent, currentChapter.value?.title || '')
     content.value = formattedContent
-    hasUnsavedChanges.value = true
-    
-    ElMessage.success('全文内容已替换为润色结果')
+    if (currentChapter.value) {
+      currentChapter.value.content = formattedContent
+    }
     showNewOptimizeDialog.value = false
-    
-    // 自动保存
-    setTimeout(() => {
-      saveCurrentChapter()
-    }, 1000)
+    await saveCurrentChapter()
+    ElMessage.success('全文内容已替换为润色结果')
   }).catch(() => {
     // 用户取消
   })
@@ -7553,21 +7563,26 @@ const handleEventAction = (command, event) => {
 }
 
 // 更新章节状态
-const updateChapterStatus = () => {
+const updateChapterStatus = async () => {
   if (!currentChapter.value) return
-  
+
   // 同步更新章节列表中的状态
   const chapterIndex = chapters.value.findIndex(ch => ch.id === currentChapter.value.id)
   if (chapterIndex > -1) {
     chapters.value[chapterIndex].status = currentChapter.value.status
     chapters.value[chapterIndex].updatedAt = new Date()
   }
-  
-  // 保存更新
-  saveCurrentChapter()
-  saveNovelData()
-  
-  ElMessage.success(`章节状态已更新为：${getChapterStatusText(currentChapter.value.status)}`)
+
+  // 直接更新状态到后端，不要调用 saveCurrentChapter 避免覆盖内容
+  try {
+    await updateChapter(currentChapter.value.id, {
+      status: currentChapter.value.status
+    })
+    ElMessage.success(`章节状态已更新为：${getChapterStatusText(currentChapter.value.status)}`)
+  } catch (e) {
+    console.error('更新章节状态失败:', e)
+    ElMessage.error('更新章节状态失败')
+  }
 }
 
 
@@ -8169,22 +8184,34 @@ ${chapters.value.map((ch, idx) => `第${idx + 1}章：${ch.title} - ${ch.descrip
       throw new Error('AI返回内容为空')
     }
     
-    // 创建新章节
-    const newChapter = {
-      id: Date.now(),
-      title: aiSingleChapterForm.value.title,
-      description: aiResponse.replace(/^大纲：/, '').trim(),
-      content: '',
-      wordCount: 0,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      status: 'draft'
+    // 创建新章节 - 保存到后端数据库
+    try {
+      const sortOrder = chapters.value.length + 1
+      const created = await createChapter(currentNovel.value.id, {
+        title: aiSingleChapterForm.value.title,
+        content: '',
+        outlineContent: aiResponse.replace(/^大纲：/, '').trim(),
+        wordCount: 0,
+        sortOrder,
+        status: 'DRAFT'
+      })
+      chapters.value.push({
+        ...created,
+        id: created.id,
+        title: created.title,
+        description: created.outlineContent || '',
+        content: created.content || '',
+        wordCount: created.wordCount || 0,
+        createdAt: new Date(created.createdAt),
+        updatedAt: new Date(created.updatedAt),
+        status: created.status || 'DRAFT'
+      })
+      showAISingleChapterDialog.value = false
+      ElMessage.success('单章大纲生成成功')
+    } catch (e) {
+      console.error('保存章节到数据库失败:', e)
+      ElMessage.error('保存章节失败')
     }
-    
-    chapters.value.push(newChapter)
-    showAISingleChapterDialog.value = false
-    ElMessage.success('单章大纲生成成功')
-    saveNovelData()
   } catch (error) {
     console.error('AI生成单章失败:', error)
     ElMessage.error(`单章生成失败: ${error.message}`)
@@ -8301,22 +8328,35 @@ ${chapterExamples.join('\n\n')}
       ElMessage.warning(`期望生成${count}个章节，但实际解析出${newChapters.length}个章节`)
     }
     
-    // 添加到章节列表
-    newChapters.forEach((chapterData, index) => {
-      const newChapter = {
-        id: Date.now() + index,
-        title: chapterData.title || `AI生成章节 ${chapters.value.length + index + 1}`,
-        description: chapterData.description || chapterData.outline || '暂无描述',
-        content: '',
-        wordCount: 0,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        status: 'draft'
+    // 保存到后端数据库
+    for (const chapterData of newChapters) {
+      try {
+        const sortOrder = chapters.value.length + 1
+        const created = await createChapter(currentNovel.value.id, {
+          title: chapterData.title || `AI生成章节 ${chapters.value.length + 1}`,
+          content: '',
+          outlineContent: chapterData.description || chapterData.outline || '暂无描述',
+          wordCount: 0,
+          sortOrder,
+          status: 'DRAFT'
+        })
+        chapters.value.push({
+          ...created,
+          id: created.id,
+          title: created.title,
+          description: created.outlineContent || '',
+          content: created.content || '',
+          wordCount: created.wordCount || 0,
+          createdAt: new Date(created.createdAt),
+          updatedAt: new Date(created.updatedAt),
+          status: created.status || 'DRAFT'
+        })
+        console.log(`添加章节 ${chapterData.title}:`, created.id)
+      } catch (e) {
+        console.error('保存章节到数据库失败:', e)
       }
-      chapters.value.push(newChapter)
-      console.log(`添加章节 ${index + 1}:`, newChapter.title)
-    })
-    
+    }
+
     showAIBatchChapterDialog.value = false
     ElMessage.success(`成功生成${newChapters.length}个章节大纲`)
     saveNovelData()
@@ -8404,13 +8444,21 @@ ${aiOptimizeForm.value.originalContent}
   }
 }
 
-const applyOptimizedContent = () => {
+const applyOptimizedContent = async () => {
   if (currentChapter.value && aiOptimizeForm.value.optimizedContent) {
     currentChapter.value.content = aiOptimizeForm.value.optimizedContent
     content.value = aiOptimizeForm.value.optimizedContent
-    hasUnsavedChanges.value = true
     showAIOptimizeDialog.value = false
-    ElMessage.success('优化内容已应用到当前章节')
+    try {
+      await updateChapter(currentChapter.value.id, {
+        content: aiOptimizeForm.value.optimizedContent,
+        wordCount: aiOptimizeForm.value.optimizedContent.replace(/<[^>]*>/g, '').length
+      })
+      ElMessage.success('优化内容已应用到当前章节')
+    } catch (e) {
+      console.error('保存优化内容失败:', e)
+      ElMessage.error('保存优化内容失败')
+    }
   } else {
     ElMessage.warning('无法应用优化内容')
   }
@@ -8475,22 +8523,34 @@ ${customPrompt}
       throw new Error('AI返回内容为空')
     }
     
-    // 创建新章节
-    const newChapter = {
-      id: Date.now(),
-      title: aiSingleChapterForm.value.title,
-      description: aiResponse.replace(/^大纲：/, '').trim(),
-      content: '',
-      wordCount: 0,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      status: 'draft'
+    // 创建新章节 - 保存到后端数据库
+    try {
+      const sortOrder = chapters.value.length + 1
+      const created = await createChapter(currentNovel.value.id, {
+        title: aiSingleChapterForm.value.title,
+        content: '',
+        outlineContent: aiResponse.replace(/^大纲：/, '').trim(),
+        wordCount: 0,
+        sortOrder,
+        status: 'DRAFT'
+      })
+      chapters.value.push({
+        ...created,
+        id: created.id,
+        title: created.title,
+        description: created.outlineContent || '',
+        content: created.content || '',
+        wordCount: created.wordCount || 0,
+        createdAt: new Date(created.createdAt),
+        updatedAt: new Date(created.updatedAt),
+        status: created.status || 'DRAFT'
+      })
+      showAISingleChapterDialog.value = false
+      ElMessage.success('使用自定义提示词生成单章成功')
+    } catch (e) {
+      console.error('保存章节到数据库失败:', e)
+      ElMessage.error('保存章节失败')
     }
-    
-    chapters.value.push(newChapter)
-    showAISingleChapterDialog.value = false
-    ElMessage.success('使用自定义提示词生成单章成功')
-    saveNovelData()
   } catch (error) {
     console.error('使用自定义提示词生成单章失败:', error)
     ElMessage.error(`单章生成失败: ${error.message}`)

@@ -29,9 +29,10 @@
           <div class="filter-left">
             <el-select v-model="statusFilter" placeholder="状态筛选" style="width: 120px;">
               <el-option label="全部" value="all" />
-              <el-option label="创作中" value="writing" />
-              <el-option label="已完成" value="completed" />
-              <el-option label="已暂停" value="paused" />
+              <el-option label="草稿" value="DRAFT" />
+              <el-option label="连载中" value="SERIALIZING" />
+              <el-option label="已完成" value="COMPLETED" />
+              <el-option label="已归档" value="ARCHIVED" />
             </el-select>
             
             <el-select v-model="genreFilter" placeholder="类型筛选" style="width: 120px;">
@@ -452,9 +453,10 @@
 
         <el-form-item label="状态" prop="status">
           <el-select v-model="editForm.status" placeholder="请选择小说状态">
-            <el-option label="创作中" value="writing" />
-            <el-option label="已完成" value="completed" />
-            <el-option label="已暂停" value="paused" />
+            <el-option label="草稿" value="DRAFT" />
+            <el-option label="连载中" value="SERIALIZING" />
+            <el-option label="已完成" value="COMPLETED" />
+            <el-option label="已归档" value="ARCHIVED" />
           </el-select>
         </el-form-item>
         
@@ -1432,7 +1434,7 @@ const updateNovelInfo = async () => {
         intro: editForm.value.description,
         cover: editForm.value.cover || undefined,
         tags: editForm.value.tags,
-        status: editForm.value.status === 'writing' ? 'SERIALIZING' : editForm.value.status === 'completed' ? 'COMPLETED' : 'DRAFT'
+        status: editForm.value.status
       })
       await loadNovels()
       
