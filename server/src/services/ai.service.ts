@@ -12,7 +12,18 @@ type GenerateTextInput = {
   operationType: string
 }
 
-function createClient() {
+async function createClient(userId: string) {
+  const provider = await prisma.aiProviderConfig.findFirst({
+    where: { userId, isDefault: true, isEnabled: true },
+  });
+
+  if (provider?.apiKey) {
+    return new OpenAI({
+      apiKey: provider.apiKey,
+      baseURL: provider.baseUrl || env.OPENAI_BASE_URL,
+    });
+  }
+
   if (!env.OPENAI_API_KEY) {
     throw new Error('OPENAI_API_KEY 未配置')
   }
@@ -24,7 +35,7 @@ function createClient() {
 }
 
 export async function generateText(input: GenerateTextInput) {
-  const client = createClient()
+  const client = await createClient(input.userId)
   await assertTokenQuota(input.userId, 4000)
 
   const model = input.model || env.OPENAI_MODEL

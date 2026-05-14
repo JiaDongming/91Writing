@@ -583,7 +583,6 @@
 </template>
 
 <script setup>
-import { getItem, setItem, removeItem } from '@/services/storageCompat'
 import { listPrompts } from '@/services/workspaceApi'
 import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
@@ -1521,20 +1520,13 @@ const regenerateChapterSummary = async () => {
 
 // 保存提示词模板到本地存储
 const saveSummaryPromptTemplate = () => {
-  try {
-    setItem('chapterSummaryPromptTemplate', summaryPromptTemplate.value)
-  } catch (error) {
-    console.error('保存提示词模板失败:', error)
-  }
+  // 提示词模板会话内保存
 }
 
-// 从本地存储加载提示词模板
+// 加载提示词模板（使用默认值）
 const loadSummaryPromptTemplate = () => {
   try {
-    const saved = getItem('chapterSummaryPromptTemplate')
-    if (saved) {
-      summaryPromptTemplate.value = saved
-    }
+    // 使用默认模板
   } catch (error) {
     console.error('加载提示词模板失败:', error)
   }

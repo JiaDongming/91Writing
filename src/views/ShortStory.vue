@@ -835,7 +835,6 @@
 </template>
 
 <script setup>
-import { getItem, setItem, removeItem } from '@/services/storageCompat'
 import { listPrompts, createPrompt as apiCreatePrompt } from '@/services/workspaceApi'
 import { ref, reactive, computed, shallowRef, onMounted, onUnmounted, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -1814,59 +1813,16 @@ const getTextWordCount = (html) => {
 
 // 配置管理方法
 const loadConfigData = () => {
-  try {
-    const savedConfig = getItem('shortStoryConfig')
-    if (savedConfig) {
-      const config = JSON.parse(savedConfig)
-      Object.keys(defaultConfigData).forEach(key => {
-        configData[key] = config[key] || [...defaultConfigData[key]]
-      })
-      console.log('加载已保存的配置数据:', configData)
-    } else {
-      // 首次使用，加载默认配置
-      Object.keys(defaultConfigData).forEach(key => {
-        configData[key] = [...defaultConfigData[key]]
-      })
-      console.log('加载默认配置数据:', configData)
-    }
-  } catch (error) {
-    console.error('加载配置失败:', error)
-    // 出错时使用默认配置
-    Object.keys(defaultConfigData).forEach(key => {
-      configData[key] = [...defaultConfigData[key]]
-    })
-    console.log('出错后使用默认配置:', configData)
-  }
-  
-  // 确保配置数据包含至少一些数据源设置
-  if (configData.genres.length === 0) {
-    configData.genres = [...defaultConfigData.genres]
-  }
-  if (configData.plotTypes.length === 0) {
-    configData.plotTypes = [...defaultConfigData.plotTypes]
-  }
-  if (configData.emotions.length === 0) {
-    configData.emotions = [...defaultConfigData.emotions]
-  }
-  if (configData.timeFrames.length === 0) {
-    configData.timeFrames = [...defaultConfigData.timeFrames]
-  }
-  if (configData.writingStyles.length === 0) {
-    configData.writingStyles = [...defaultConfigData.writingStyles]
-  }
-  
-  console.log('最终配置数据:', configData)
+  // 使用默认配置
+  Object.keys(defaultConfigData).forEach(key => {
+    configData[key] = [...defaultConfigData[key]]
+  })
 }
 
 const saveConfigData = () => {
-  try {
-    setItem('shortStoryConfig', JSON.stringify(configData))
-    ElMessage.success('配置保存成功！')
-    showConfigManager.value = false
-  } catch (error) {
-    console.error('保存配置失败:', error)
-    ElMessage.error('保存配置失败')
-  }
+  // 配置会话内保存
+  ElMessage.success('配置保存成功！')
+  showConfigManager.value = false
 }
 
 const addConfigItem = (type) => {
@@ -1895,14 +1851,8 @@ const removeWritingStyle = (index) => {
 }
 
 const saveWritingStyleConfig = () => {
-  try {
-    setItem('shortStoryConfig', JSON.stringify(configData))
-    ElMessage.success('文风配置保存成功！')
-    showWritingStyleManager.value = false
-  } catch (error) {
-    console.error('保存文风配置失败:', error)
-    ElMessage.error('保存文风配置失败')
-  }
+  ElMessage.success('文风配置保存成功！')
+  showWritingStyleManager.value = false
 }
 
 const openConfigManager = () => {

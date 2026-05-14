@@ -331,13 +331,12 @@
 </template>
 
 <script setup>
-import { getItem, setItem, removeItem } from '@/services/storageCompat'
 import { ref, watch, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Download, Upload, Document, Setting, Delete, ChatLineSquare, Collection } from '@element-plus/icons-vue'
 import ApiConfig from '@/components/ApiConfig.vue'
 import { listNovels } from '@/services/novelApi'
-import { listPrompts, listGenres, listGoals } from '@/services/workspaceApi'
+import { listPrompts, listGenres, listGoals, updateSettings } from '@/services/workspaceApi'
 
 // 响应式数据
 const activeTab = ref('api')
@@ -502,15 +501,17 @@ const clearNovels = () => {
 
 const clearSettings = () => {
   ElMessageBox.confirm(
-    '确定要重置 API 配置吗？',
+    '确定要重置 API 配置吗？此操作将清除后端保存的配置。',
     '确认重置设置',
     { confirmButtonText: '确定重置', cancelButtonText: '取消', type: 'warning' }
-  ).then(() => {
-    localStorage.removeItem('apiConfigType')
-    localStorage.removeItem('officialApiConfig')
-    localStorage.removeItem('customApiConfig')
-    ElMessage.success('API 配置已重置')
-    setTimeout(() => location.reload(), 1000)
+  ).then(async () => {
+    try {
+      await updateSettings({ apiConfigType: 'official', officialApiConfig: {}, customApiConfig: {} })
+      ElMessage.success('API 配置已重置')
+      setTimeout(() => location.reload(), 1000)
+    } catch (e) {
+      ElMessage.error('重置失败：' + (e.response?.data?.message || e.message))
+    }
   })
 }
 

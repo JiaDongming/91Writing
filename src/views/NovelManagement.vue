@@ -619,7 +619,7 @@ const editForm = ref({
   tags: []
 })
 
-// 动态类型预设配置 - 从localStorage读取
+// 动态类型预设配置 - 从后端加载
 const genrePresets = ref({})
 
 // 表单验证规则
@@ -761,22 +761,9 @@ const loadDefaultGenres = async () => {
   genrePresets.value = defaultGenres
 }
 
-// 更新类型使用计数
+// 更新类型使用计数（功能已迁移到后端统计）
 const updateGenreUsageCount = async (genreCode) => {
-  try {
-    const saved = localStorage.getItem('novelGenres')
-    if (saved) {
-      const genres = JSON.parse(saved)
-      const genreIndex = genres.findIndex(g => g.code === genreCode)
-      if (genreIndex > -1) {
-        genres[genreIndex].usageCount = (genres[genreIndex].usageCount || 0) + 1
-        localStorage.setItem('novelGenres', JSON.stringify(genres))
-        console.log(`类型 ${genreCode} 使用计数更新为:`, genres[genreIndex].usageCount)
-      }
-    }
-  } catch (error) {
-    console.error('更新类型使用计数失败:', error)
-  }
+  // 使用计数由后端 TokenUsage / Novel 创建记录自动统计
 }
 
 const formatNumber = async (num) => {

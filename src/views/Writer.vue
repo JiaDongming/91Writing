@@ -2124,11 +2124,10 @@
 </template>
 
 <script setup>
-import { getItem, setItem, removeItem } from '@/services/storageCompat'
 import { ref, computed, onMounted, onUnmounted, watch, shallowRef, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { 
+import {
   ArrowLeft, DocumentAdd, Plus, Edit, Delete, Document, MoreFilled, ArrowDown, Star, Tools, ArrowRight, Right, Check, InfoFilled, MagicStick, Close, CopyDocument
 } from '@element-plus/icons-vue'
 import { Editor, Toolbar } from '@wangeditor/editor-for-vue'
@@ -2136,6 +2135,8 @@ import '@wangeditor/editor/dist/css/style.css'
 import apiService from '../services/api.js'
 import billingService from '../services/billing.js'
 import { useNovelStore } from '../stores/novel.js'
+import { getNovel, updateNovel } from '@/services/novelApi'
+import { listPrompts, createPrompt, updatePrompt, deletePrompt } from '@/services/workspaceApi'
 
 const route = useRoute()
 const router = useRouter()
@@ -2968,19 +2969,25 @@ watch(streamingContent, () => {
 })
 
 // 加载提示词数据
-const loadPrompts = () => {
-  const savedPrompts = getItem('prompts')
-  if (savedPrompts) {
-    try {
-      availablePrompts.value = JSON.parse(savedPrompts)
-    } catch (error) {
-      console.error('加载提示词失败:', error)
+const loadPrompts = async () => {
+  try {
+    const prompts = await listPrompts()
+    if (prompts && prompts.length > 0) {
+      availablePrompts.value = prompts.map(p => ({
+        id: p.id,
+        title: p.title,
+        category: p.category || 'writing',
+        content: p.content,
+        variables: p.variables || [],
+        isSystem: p.isSystem || false,
+        isDefault: false
+      }))
+    } else {
       availablePrompts.value = getDefaultPrompts()
-      savePrompts()
     }
-  } else {
+  } catch (error) {
+    console.error('加载提示词失败:', error)
     availablePrompts.value = getDefaultPrompts()
-    savePrompts() // 首次加载时保存默认提示词
   }
 }
 
@@ -3222,10 +3229,30 @@ const getDefaultPrompts = () => {
   ]
 }
 
-// 保存提示词到本地存储
-const savePrompts = () => {
+// 保存提示词到后端
+const savePrompts = async () => {
   try {
-    setItem('prompts', JSON.stringify(availablePrompts.value))
+    for (const prompt of availablePrompts.value) {
+      if (prompt.isDefault) continue
+      if (prompt._backendId) {
+        await updatePrompt(prompt._backendId, {
+          title: prompt.title,
+          category: prompt.category,
+          content: prompt.content,
+          variables: prompt.variables || [],
+          isSystem: prompt.isSystem || false
+        })
+      } else {
+        const created = await createPrompt({
+          title: prompt.title,
+          category: prompt.category || 'writing',
+          content: prompt.content,
+          variables: prompt.variables || [],
+          isSystem: prompt.isSystem || false
+        })
+        prompt._backendId = created.id
+      }
+    }
   } catch (error) {
     console.error('保存提示词失败:', error)
   }
@@ -5477,8 +5504,7 @@ const resetOptimizePromptDialog = () => {
 }
 
 const getOptimizePrompts = () => {
-  const prompts = JSON.parse(getItem('prompts') || '[]')
-  return prompts.filter(p => p.category === 'polish' || p.category === 'optimize')
+  return availablePrompts.value.filter(p => p.category === 'polish' || p.category === 'optimize')
 }
 
 const refreshOptimizePrompts = () => {
@@ -7605,100 +7631,95 @@ const autoSave = () => {
 }
 
 // 数据保存方法
-const saveNovelData = () => {
+const saveNovelData = async () => {
   if (!currentNovel.value) return
-  
+
   const totalWordCount = chapters.value.reduce((sum, ch) => sum + (ch.wordCount || 0), 0)
-  
-  const novelData = {
-    ...currentNovel.value,
-    chapterList: chapters.value,
-    characters: characters.value,
-    worldSettings: novelStore.worldSettings,
-    corpusData: corpusData.value,
-    events: events.value,
-    updatedAt: new Date(),
-    wordCount: totalWordCount,
-    // 保持兼容性的字段
-    chapters: chapters.value.length,
-    totalWords: totalWordCount
-  }
-  
-  const novels = JSON.parse(getItem('novels') || '[]')
-  const index = novels.findIndex(n => n.id === currentNovel.value.id)
-  if (index > -1) {
-    novels[index] = novelData
-  } else {
-    novels.push(novelData)
-  }
-  setItem('novels', JSON.stringify(novels))
+
+  try {
+    await updateNovel(currentNovel.value.id, {
+      title: currentNovel.value.title,
+      genre: currentNovel.value.genre,
+      intro: currentNovel.value.description || currentNovel.value.intro || '',
+      cover: currentNovel.value.cover || undefined,
+      tags: currentNovel.value.tags || [],
+      wordCount: totalWordCount
+    })
+  } catch (e) { console.error('保存小说失败:', e) }
 }
 
 // 初始化
-const initNovel = () => {
-  const novelId = parseInt(route.query.novelId)
-  if (novelId) {
-    // 从localStorage加载小说数据
-    const novels = JSON.parse(getItem('novels') || '[]')
-    const novel = novels.find(n => n.id === novelId)
-    
-    if (novel) {
-      currentNovel.value = novel
-      
-      // 处理日期对象
-      if (novel.chapterList) {
-        chapters.value = novel.chapterList.map(chapter => {
-          // 修复旧数据中可能存在的'outline'状态
-          let fixedStatus = chapter.status || 'draft'
-          if (fixedStatus === 'outline') {
-            fixedStatus = 'draft'
-          }
-          
-          return {
-            ...chapter,
-            createdAt: new Date(chapter.createdAt),
-            updatedAt: new Date(chapter.updatedAt),
-            // 确保状态字段存在，兼容旧数据，并修复错误的'outline'状态
-            status: fixedStatus
-          }
-        })
-        
-        // 如果存在章节，自动选择第一章节
-        if (chapters.value.length > 0) {
-          selectChapter(chapters.value[0])
-        }
-        
-        // 保存修复后的数据
-        saveNovelData()
-      }
-      
-      // 加载相关数据
-      characters.value = novel.characters || []
-      // 加载世界观设定到store中
-      // 先清空store中的世界观设定
-      novelStore.worldSettings.splice(0, novelStore.worldSettings.length)
-      // 添加小说的世界观设定到store
-      if (novel.worldSettings && novel.worldSettings.length > 0) {
-        novel.worldSettings.forEach(setting => {
-          novelStore.worldSettings.push(setting)
-        })
-      }
-      corpusData.value = novel.corpusData || []
-      events.value = novel.events || []
-    } else {
+const initNovel = async () => {
+  const novelId = route.query.novelId
+  if (!novelId) {
+    ElMessage.error('缺少小说ID参数')
+    router.push('/novels')
+    return
+  }
+
+  try {
+    const novel = await getNovel(novelId)
+    if (!novel) {
       ElMessage.error('小说不存在')
       router.push('/novels')
+      return
     }
-  } else {
-    ElMessage.error('缺少小说ID参数')
+
+    currentNovel.value = {
+      id: novel.id,
+      title: novel.title,
+      genre: novel.genre,
+      description: novel.intro || '',
+      intro: novel.intro || '',
+      cover: novel.cover || '',
+      tags: novel.tags || [],
+      createdAt: new Date(novel.createdAt),
+      updatedAt: new Date(novel.updatedAt)
+    }
+
+    if (novel.chapters && novel.chapters.length > 0) {
+      chapters.value = novel.chapters.map(chapter => ({
+        ...chapter,
+        createdAt: new Date(chapter.createdAt),
+        updatedAt: new Date(chapter.updatedAt),
+        status: chapter.status || 'draft'
+      }))
+
+      if (chapters.value.length > 0) {
+        selectChapter(chapters.value[0])
+      }
+    }
+
+    if (novel.characters) {
+      characters.value = novel.characters
+    }
+
+    novelStore.worldSettings.splice(0, novelStore.worldSettings.length)
+    if (novel.worldSettings && novel.worldSettings.length > 0) {
+      novel.worldSettings.forEach(setting => {
+        novelStore.worldSettings.push(setting)
+      })
+    }
+
+    if (novel.storyEvents && novel.storyEvents.length > 0) {
+      events.value = novel.storyEvents.map(event => ({
+        ...event,
+        date: event.timePoint || event.createdAt,
+        title: event.title,
+        description: event.description
+      }))
+    }
+  } catch (e) {
+    console.error('加载小说失败:', e)
+    ElMessage.error('加载小说失败，请返回重试')
     router.push('/novels')
   }
 }
 
 // 生命周期
-onMounted(() => {
-  initNovel()
-  loadPrompts()
+onMounted(async () => {
+  await initNovel()
+  await loadPrompts()
 })
 
 onUnmounted(() => {

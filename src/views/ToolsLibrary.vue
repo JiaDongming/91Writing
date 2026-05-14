@@ -239,7 +239,6 @@
 </template>
 
 <script setup>
-import { getItem, setItem, removeItem } from '@/services/storageCompat'
 import { listNovels, getNovel } from '@/services/novelApi'
 import { listPrompts } from '@/services/workspaceApi'
 import { ref, reactive, computed, nextTick, onMounted } from 'vue'

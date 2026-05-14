@@ -285,7 +285,6 @@
 </template>
 
 <script setup>
-import { getItem, setItem, removeItem } from '@/services/storageCompat'
 import { ref, computed, reactive } from 'vue'
 import { useNovelStore } from '@/stores/novel'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -297,6 +296,7 @@ const templateFormRef = ref()
 const editFormRef = ref()
 const searchKeyword = ref('')
 const showEditDialog = ref(false)
+const customTemplates = ref([])
 
 const newTemplate = reactive({
   name: '',
@@ -339,7 +339,7 @@ const templateRules = {
 const templates = computed(() => {
   // 合并系统模板和自定义模板
   const systemTemplates = novelStore.templates.map(t => ({ ...t, isSystem: true }))
-  const customTemplates = JSON.parse(getItem('customTemplates') || '[]')
+  const customTemplates = customTemplates.value
     .map(t => ({ ...t, isSystem: false }))
   
   return [...systemTemplates, ...customTemplates]
@@ -360,7 +360,7 @@ const addTemplate = async () => {
   try {
     await templateFormRef.value.validate()
     
-    const customTemplates = JSON.parse(getItem('customTemplates') || '[]')
+    const customTemplates = customTemplates.value
     const newId = Date.now()
     
     const template = {
@@ -375,7 +375,7 @@ const addTemplate = async () => {
     }
     
     customTemplates.push(template)
-    setItem('customTemplates', JSON.stringify(customTemplates))
+    /* customTemplates saved in-memory */
     
     ElMessage.success('模板创建成功')
     resetForm()
@@ -431,7 +431,7 @@ const saveEdit = async () => {
   try {
     await editFormRef.value.validate()
     
-    const customTemplates = JSON.parse(getItem('customTemplates') || '[]')
+    const customTemplates = customTemplates.value
     const index = customTemplates.findIndex(t => t.id === editingTemplate.id)
     
     if (index > -1) {
@@ -446,7 +446,7 @@ const saveEdit = async () => {
         updatedAt: new Date().toISOString()
       }
       
-      setItem('customTemplates', JSON.stringify(customTemplates))
+      /* customTemplates saved in-memory */
       ElMessage.success('模板更新成功')
       showEditDialog.value = false
     }
@@ -467,9 +467,9 @@ const deleteTemplate = async (id) => {
       }
     )
     
-    const customTemplates = JSON.parse(getItem('customTemplates') || '[]')
+    const customTemplates = customTemplates.value
     const filteredTemplates = customTemplates.filter(t => t.id !== id)
-    setItem('customTemplates', JSON.stringify(filteredTemplates))
+    /* customTemplates saved in-memory */
     
     ElMessage.success('删除成功')
   } catch {

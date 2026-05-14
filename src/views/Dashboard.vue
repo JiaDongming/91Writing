@@ -189,7 +189,6 @@
 </template>
 
 <script setup>
-import { getItem, setItem, removeItem } from '@/services/storageCompat'
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useNovelStore } from '@/stores/novel'
@@ -266,19 +265,15 @@ const defaultCustomModels = [
   { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo', description: 'OpenAI经典对话模型' }
 ]
 
-const loadCustomModels = () => {
+const loadCustomModels = (serverModels) => {
   const models = [...defaultCustomModels]
-  try {
-    const saved = getItem('customModels')
-    if (saved) {
-      const parsed = JSON.parse(saved)
-      for (const model of parsed) {
-        if (!models.find(m => m.id === model.id)) {
-          models.push(model)
-        }
+  if (serverModels && Array.isArray(serverModels)) {
+    for (const model of serverModels) {
+      if (!models.find(m => m.id === model.id)) {
+        models.push(model)
       }
     }
-  } catch { /* ignore */ }
+  }
   customModels.value = models
 }
 
@@ -301,17 +296,7 @@ const pageTitle = computed(() => {
 
 // 获取当前配置类型
 const getCurrentConfigType = () => {
-  try {
-    const savedConfigType = getItem('apiConfigType')
-    if (!savedConfigType && isApiConfigured.value && currentApiConfig.value) {
-      const baseURL = currentApiConfig.value.baseURL
-      if (baseURL && baseURL.includes('91hub.vip')) return 'official'
-      return 'custom'
-    }
-    return savedConfigType || 'official'
-  } catch {
-    return 'official'
-  }
+  return configType.value || 'official'
 }
 
 // 方法
@@ -342,7 +327,6 @@ const handleAnnouncementClose = () => {
   showAnnouncement.value = false
 }
 
-// 模型相关功能
 const handleModelChange = async (modelId) => {
   try {
     const isOfficialModel = officialModels.value.find(m => m.id === modelId)
@@ -353,39 +337,25 @@ const handleModelChange = async (modelId) => {
 
     if (isOfficialModel) {
       newConfigType = 'official'
-      const savedOfficialConfig = getItem('officialApiConfig')
-      if (savedOfficialConfig) {
-        newConfig = JSON.parse(savedOfficialConfig)
-      } else {
-        newConfig = {
-          baseURL: 'https://ai.91hub.vip/v1',
-          maxTokens: 4096,
-          unlimitedTokens: false,
-          temperature: 0.7,
-          apiKey: ''
-        }
+      newConfig = {
+        baseURL: 'https://ai.91hub.vip/v1',
+        maxTokens: null,
+        unlimitedTokens: true,
+        temperature: 0.7,
+        apiKey: ''
       }
       newConfig.selectedModel = modelId
-      setItem('apiConfigType', 'official')
-      setItem('officialApiConfig', JSON.stringify(newConfig))
 
     } else if (isCustomModel) {
       newConfigType = 'custom'
-      const savedCustomConfig = getItem('customApiConfig')
-      if (savedCustomConfig) {
-        newConfig = JSON.parse(savedCustomConfig)
-      } else {
-        newConfig = {
-          baseURL: 'https://api.openai.com/v1',
-          maxTokens: 4096,
-          unlimitedTokens: false,
-          temperature: 0.7,
-          apiKey: ''
-        }
+      newConfig = {
+        baseURL: 'https://api.openai.com/v1',
+        maxTokens: null,
+        unlimitedTokens: true,
+        temperature: 0.7,
+        apiKey: ''
       }
       newConfig.selectedModel = modelId
-      setItem('apiConfigType', 'custom')
-      setItem('customApiConfig', JSON.stringify(newConfig))
 
     } else {
       ElMessage.error('未知的模型类型')
@@ -396,7 +366,6 @@ const handleModelChange = async (modelId) => {
     novelStore.updateApiConfig(newConfig, newConfigType)
     novelStore.switchConfigType(newConfigType)
 
-    // 保存到后端 settings
     try {
       const settings = await getSettings()
       const data = settings?.data || {}
@@ -419,18 +388,15 @@ const handleModelChange = async (modelId) => {
         }
       }
       await updateSettings(data)
-    } catch { /* backend save optional */ }
+    } catch (e) {
+      ElMessage.error('保存模型配置到后端失败: ' + (e.response?.data?.message || e.message))
+      return
+    }
 
     const modelName = getModelDisplayName(modelId)
     const configTypeName = newConfigType === 'official' ? '官方配置' : '自定义配置'
-    const needsApiKey = !newConfig.apiKey || newConfig.apiKey.trim() === ''
 
-    if (needsApiKey) {
-      ElMessage.warning(`已切换到${configTypeName}: ${modelName}，请先配置API密钥`)
-      setTimeout(() => { showApiConfig.value = true }, 1000)
-    } else {
-      ElMessage.success(`已切换到${configTypeName}: ${modelName}`)
-    }
+    ElMessage.success(`已切换到${configTypeName}: ${modelName}`)
   } catch (error) {
     ElMessage.error('切换模型失败: ' + error.message)
   }
@@ -447,41 +413,23 @@ const getModelDisplayName = (modelId) => {
 // 初始化模型选择器（从后端加载）
 const initializeModelSelector = async () => {
   try {
-    // 从后端加载 settings
-    let data = {}
-    try {
-      const settings = await getSettings()
-      data = settings?.data || {}
-    } catch { /* use localStorage fallback */ }
+    const settings = await getSettings()
+    const data = settings?.data || {}
 
-    // 加载配置类型
-    const savedConfigType = data.apiConfigType || getItem('apiConfigType') || 'official'
-    configType.value = savedConfigType
+    configType.value = data.apiConfigType || 'official'
 
-    // 加载自定义模型列表
     if (data.customModels && Array.isArray(data.customModels)) {
-      const models = [...defaultCustomModels]
-      for (const model of data.customModels) {
-        if (!models.find(m => m.id === model.id)) {
-          models.push(model)
-        }
-      }
-      customModels.value = models
+      loadCustomModels(data.customModels)
     } else {
-      loadCustomModels()
+      loadCustomModels(null)
     }
 
-    // 获取当前选中的模型
     if (isApiConfigured.value && currentApiConfig.value) {
       currentModel.value = currentApiConfig.value.selectedModel || ''
     }
   } catch {
-    // Fallback to localStorage
-    configType.value = getItem('apiConfigType') || 'official'
-    if (isApiConfigured.value && currentApiConfig.value) {
-      currentModel.value = currentApiConfig.value.selectedModel || ''
-    }
-    loadCustomModels()
+    configType.value = 'official'
+    loadCustomModels(null)
   }
 }
 

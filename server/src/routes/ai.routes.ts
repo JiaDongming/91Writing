@@ -24,7 +24,18 @@ const chatSchema = z.object({
   chapterId: z.string().optional(),
 });
 
-function getOpenAIClient() {
+async function getOpenAIClient(userId: string) {
+  const provider = await prisma.aiProviderConfig.findFirst({
+    where: { userId, isDefault: true, isEnabled: true },
+  });
+
+  if (provider?.apiKey) {
+    return new OpenAI({
+      apiKey: provider.apiKey,
+      baseURL: provider.baseUrl || env.OPENAI_BASE_URL,
+    });
+  }
+
   if (!env.OPENAI_API_KEY) {
     throw new Error("OPENAI_API_KEY 未配置");
   }
@@ -50,7 +61,7 @@ router.post(
       const estimatedTokens = input.messages.reduce((sum, m) => sum + m.content.length, 0);
       await assertTokenQuota(request.auth!.userId, Math.min(estimatedTokens, 8000));
 
-      const client = getOpenAIClient();
+      const client = await getOpenAIClient(request.auth!.userId);
 
       if (input.stream) {
         response.setHeader("Content-Type", "text/event-stream; charset=utf-8");

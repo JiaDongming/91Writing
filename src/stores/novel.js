@@ -1,7 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import apiService from '../services/api.js'
-import { getItem, setItem, removeItem } from '@/services/storageCompat'
 import { getSettings } from '@/services/workspaceApi'
 
 export const useNovelStore = defineStore('novel', () => {
@@ -51,43 +50,7 @@ export const useNovelStore = defineStore('novel', () => {
     return currentConfigType.value === 'official' ? officialApiConfig.value : customApiConfig.value
   }
 
-  // 初始化时检查API配置
-  const initializeApiConfig = () => {
-    try {
-      const savedType = getItem('apiConfigType') || 'official'
-      currentConfigType.value = savedType
-
-      const savedOfficial = getItem('officialApiConfig')
-      if (savedOfficial) {
-        try {
-          const config = JSON.parse(savedOfficial)
-          if (config.selectedModel) officialApiConfig.value.selectedModel = config.selectedModel
-          if (config.temperature !== undefined) officialApiConfig.value.temperature = config.temperature
-          if (config.maxTokens !== undefined) officialApiConfig.value.maxTokens = config.maxTokens
-          if (config.unlimitedTokens !== undefined) officialApiConfig.value.unlimitedTokens = config.unlimitedTokens
-        } catch { /* ignore parse errors */ }
-      }
-
-      const savedCustom = getItem('customApiConfig')
-      if (savedCustom) {
-        try {
-          const config = JSON.parse(savedCustom)
-          if (config.selectedModel) customApiConfig.value.selectedModel = config.selectedModel
-          if (config.temperature !== undefined) customApiConfig.value.temperature = config.temperature
-          if (config.maxTokens !== undefined) customApiConfig.value.maxTokens = config.maxTokens
-          if (config.unlimitedTokens !== undefined) customApiConfig.value.unlimitedTokens = config.unlimitedTokens
-        } catch { /* ignore parse errors */ }
-      }
-
-      const currentConfig = getCurrentApiConfig()
-      apiService.updateConfig(currentConfig)
-    } catch (error) {
-      console.error('初始化API配置失败:', error)
-    }
-  }
-
-  // 立即执行初始化（从 localStorage 同步加载，快速启动）
-  initializeApiConfig()
+  // API 配置从后端加载，不再从 localStorage 读取
 
   // 从后端恢复 API 配置（异步，覆盖 localStorage 缓存）
   const initFromBackend = async () => {
@@ -117,15 +80,10 @@ export const useNovelStore = defineStore('novel', () => {
         if (c.apiKey !== undefined) customApiConfig.value.apiKey = c.apiKey
       }
 
-      // 同步到 localStorage 缓存
-      if (data.apiConfigType) setItem('apiConfigType', data.apiConfigType)
-      if (data.officialApiConfig) setItem('officialApiConfig', JSON.stringify(data.officialApiConfig))
-      if (data.customApiConfig) setItem('customApiConfig', JSON.stringify(data.customApiConfig))
-
       const currentConfig = getCurrentApiConfig()
       apiService.updateConfig(currentConfig)
     } catch {
-      // 后端不可用时，依赖 localStorage 缓存
+      // 后端不可用时使用内存中的默认配置
     }
   }
   
@@ -367,7 +325,6 @@ export const useNovelStore = defineStore('novel', () => {
   // 切换配置类型
   const switchConfigType = (type) => {
     currentConfigType.value = type
-    setItem('apiConfigType', type)
 
     const currentConfig = getCurrentApiConfig()
     apiService.updateConfig(currentConfig)

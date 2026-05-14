@@ -22,6 +22,14 @@ const MIGRATED_KEYS = [
   'customTemplates',
   'api-config',
   'token-usage',
+  'apiConfigType',
+  'officialApiConfig',
+  'customApiConfig',
+  'customModels',
+  'auto_backup_settings',
+  'backup_list',
+  'chapterSummaryPromptTemplate',
+  'shortStoryConfig',
 ]
 
 export function getItem(key) {

@@ -319,7 +319,6 @@
 </template>
 
 <script setup>
-import { getItem, setItem, removeItem } from '@/services/storageCompat'
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useNovelStore } from '../stores/novel.js'
@@ -447,7 +446,6 @@ const handleOfficialUnlimitedTokensChange = () => {
 const saveOfficialConfig = async () => {
   validating.value = true
   try {
-    // 保存到后端
     const providers = await listProviders()
     const existing = providers.find(p => p.provider === 'OPENAI' && p.name === '91写作官方')
     const providerData = {
@@ -465,7 +463,6 @@ const saveOfficialConfig = async () => {
       await createProvider(providerData)
     }
 
-    // 保存配置偏好到 settings
     const settings = await getSettings()
     const data = settings?.data || {}
     data.officialApiConfig = {
@@ -476,10 +473,6 @@ const saveOfficialConfig = async () => {
     }
     data.apiConfigType = 'official'
     await updateSettings(data)
-
-    // 同步到 localStorage 缓存
-    setItem('officialApiConfig', JSON.stringify(officialForm))
-    setItem('apiConfigType', 'official')
 
     store.updateApiConfig(officialForm, 'official')
     store.switchConfigType('official')
@@ -548,25 +541,32 @@ const removeCustomModel = (modelId) => {
   }
 }
 
-const saveCustomModels = () => {
-  setItem('customModels', JSON.stringify(customModels.value))
+const saveCustomModels = async () => {
+  try {
+    const settings = await getSettings()
+    const data = settings?.data || {}
+    data.customModels = customModels.value
+    await updateSettings(data)
+  } catch (error) {
+    console.error('保存自定义模型失败:', error)
+  }
 }
 
-const loadCustomModels = () => {
-  const saved = getItem('customModels')
-  if (saved) {
-    try {
-      customModels.value = JSON.parse(saved)
-    } catch (error) {
-      console.error('加载自定义模型失败:', error)
+const loadCustomModels = async () => {
+  try {
+    const settings = await getSettings()
+    const data = settings?.data || {}
+    if (data.customModels && Array.isArray(data.customModels)) {
+      customModels.value = data.customModels
     }
+  } catch (error) {
+    console.error('加载自定义模型失败:', error)
   }
 }
 
 const saveCustomConfig = async () => {
   validating.value = true
   try {
-    // 保存到后端 Provider
     const providers = await listProviders()
     const existing = providers.find(p => p.provider === 'CUSTOM' && p.name === '自定义配置')
     const providerData = {
@@ -584,7 +584,6 @@ const saveCustomConfig = async () => {
       await createProvider(providerData)
     }
 
-    // 保存配置偏好和自定义模型到 settings
     const settings = await getSettings()
     const data = settings?.data || {}
     data.customApiConfig = {
@@ -598,11 +597,6 @@ const saveCustomConfig = async () => {
     data.customModels = customModels.value
     data.apiConfigType = 'custom'
     await updateSettings(data)
-
-    // 同步到 localStorage 缓存
-    setItem('customApiConfig', JSON.stringify(customForm))
-    setItem('customModels', JSON.stringify(customModels.value))
-    setItem('apiConfigType', 'custom')
 
     store.updateApiConfig(customForm, 'custom')
     store.switchConfigType('custom')
@@ -636,49 +630,26 @@ const resetCustomConfig = () => {
     unlimitedTokens: false,
     temperature: 0.7
   })
-  removeItem('customApiConfig')
   ElMessage.success('自定义配置已重置')
 }
 
-// 加载保存的配置（从后端，fallback 到 localStorage）
+// 加载保存的配置（从后端）
 const loadSavedConfig = async () => {
   try {
-    // 从后端加载
     const settings = await getSettings()
     const data = settings?.data || {}
 
-    // 加载配置类型
-    const savedType = data.apiConfigType || getItem('apiConfigType') || 'official'
-    configType.value = savedType
+    configType.value = data.apiConfigType || 'official'
 
-    // 加载官方配置
     const officialSettings = data.officialApiConfig
     if (officialSettings) {
-      if (officialSettings.apiKey) officialForm.apiKey = officialSettings.apiKey
       if (officialSettings.selectedModel) officialForm.selectedModel = officialSettings.selectedModel
       if (officialSettings.maxTokens !== undefined) officialForm.maxTokens = officialSettings.maxTokens
       if (officialSettings.unlimitedTokens !== undefined) officialForm.unlimitedTokens = officialSettings.unlimitedTokens
       if (officialSettings.temperature !== undefined) officialForm.temperature = officialSettings.temperature
     }
-    // Fallback to localStorage
-    if (!officialSettings) {
-      const savedOfficial = getItem('officialApiConfig')
-      if (savedOfficial) {
-        try {
-          const config = JSON.parse(savedOfficial)
-          if (config.apiKey) officialForm.apiKey = config.apiKey
-          if (config.selectedModel) officialForm.selectedModel = config.selectedModel
-          if (config.maxTokens !== undefined) officialForm.maxTokens = config.maxTokens
-          if (config.unlimitedTokens !== undefined) officialForm.unlimitedTokens = config.unlimitedTokens
-          else if (config.maxTokens === null) officialForm.unlimitedTokens = true
-          if (config.temperature !== undefined) officialForm.temperature = config.temperature
-        } catch { /* ignore */ }
-      }
-    }
-    // 强制保持官方API地址
     officialForm.baseURL = 'https://ai.91hub.vip/v1'
 
-    // 加载自定义配置
     const customSettings = data.customApiConfig
     if (customSettings) {
       Object.assign(customForm, customSettings)
@@ -686,51 +657,12 @@ const loadSavedConfig = async () => {
         customForm.unlimitedTokens = customSettings.maxTokens === null
       }
     }
-    // Fallback to localStorage
-    if (!customSettings) {
-      const savedCustom = getItem('customApiConfig')
-      if (savedCustom) {
-        try {
-          const config = JSON.parse(savedCustom)
-          if (config.unlimitedTokens === undefined) {
-            config.unlimitedTokens = config.maxTokens === null
-          }
-          Object.assign(customForm, config)
-        } catch { /* ignore */ }
-      }
-    }
 
-    // 加载自定义模型列表
     if (data.customModels && Array.isArray(data.customModels)) {
       customModels.value = data.customModels
-    } else {
-      loadCustomModels() // fallback to localStorage
     }
   } catch (error) {
-    console.error('从后端加载配置失败，使用本地缓存:', error)
-    // Fallback to localStorage
-    const savedType = getItem('apiConfigType') || 'official'
-    configType.value = savedType
-    const savedOfficial = getItem('officialApiConfig')
-    if (savedOfficial) {
-      try {
-        const config = JSON.parse(savedOfficial)
-        if (config.apiKey) officialForm.apiKey = config.apiKey
-        if (config.selectedModel) officialForm.selectedModel = config.selectedModel
-        if (config.maxTokens !== undefined) officialForm.maxTokens = config.maxTokens
-        if (config.temperature !== undefined) officialForm.temperature = config.temperature
-      } catch { /* ignore */ }
-    }
-    officialForm.baseURL = 'https://ai.91hub.vip/v1'
-    const savedCustom = getItem('customApiConfig')
-    if (savedCustom) {
-      try {
-        const config = JSON.parse(savedCustom)
-        if (config.unlimitedTokens === undefined) config.unlimitedTokens = config.maxTokens === null
-        Object.assign(customForm, config)
-      } catch { /* ignore */ }
-    }
-    loadCustomModels()
+    console.error('从后端加载配置失败:', error)
   }
 
   // 应用当前配置到 store

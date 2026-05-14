@@ -266,7 +266,6 @@
 </template>
 
 <script setup>
-import { getItem, setItem, removeItem } from '@/services/storageCompat'
 import { ref, computed, onMounted } from 'vue'
 import { useNovelStore } from '@/stores/novel'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -557,17 +556,15 @@ const saveAutoBackupSettings = () => {
     autoBackupFrequency: autoBackupFrequency.value,
     maxBackupCount: maxBackupCount.value
   }
-  setItem('auto_backup_settings', JSON.stringify(settings))
+  // auto-backup settings are session-only
 }
 
 const loadAutoBackupSettings = () => {
   try {
-    const saved = getItem('auto_backup_settings')
-    if (saved) {
-      const settings = JSON.parse(saved)
-      autoBackupEnabled.value = settings.autoBackupEnabled || false
-      autoBackupFrequency.value = settings.autoBackupFrequency || 'daily'
-      maxBackupCount.value = settings.maxBackupCount || 10
+    // Backup settings use in-memory defaults only
+    autoBackupEnabled.value = false
+    autoBackupFrequency.value = 'daily'
+    maxBackupCount.value = 10
     }
   } catch (error) {
     console.error('加载自动备份设置失败:', error)
@@ -588,13 +585,12 @@ const saveBackups = () => {
     ...backup,
     data: undefined // 移除数据部分
   }))
-  setItem('backup_list', JSON.stringify(backupMeta))
+  // backup list is session-only
 }
 
 const loadBackups = () => {
   try {
-    const saved = getItem('backup_list')
-    if (saved) {
+    // Backups are session-only
       backups.value = JSON.parse(saved)
     }
   } catch (error) {
