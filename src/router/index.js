@@ -1,4 +1,6 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
+import { useAuthStore } from '../stores/auth'
+import { useNovelStore } from '../stores/novel'
 import Dashboard from '../views/Dashboard.vue'
 import HomePage from '../views/HomePage.vue'
 import PromptsLibrary from '../views/PromptsLibrary.vue'
@@ -104,6 +106,7 @@ const router = createRouter({
 // 导航守卫 —— 未登录跳转登录页
 router.beforeEach(async (to, from, next) => {
   const token = localStorage.getItem('accessToken')
+  const authStore = useAuthStore()
 
   if (to.meta.noAuth) {
     // 已登录用户访问登录页，跳转首页
@@ -115,6 +118,17 @@ router.beforeEach(async (to, from, next) => {
 
   if (to.meta.requiresAuth && !token) {
     return next({ path: '/login', query: { redirect: to.fullPath } })
+  }
+
+  // 有 token 但用户信息为空，恢复登录态
+  if (token && !authStore.user) {
+    await authStore.init()
+    if (!authStore.user) {
+      return next({ path: '/login', query: { redirect: to.fullPath } })
+    }
+    // 恢复 API 配置（从后端加载）
+    const novelStore = useNovelStore()
+    await novelStore.initFromBackend()
   }
 
   next()

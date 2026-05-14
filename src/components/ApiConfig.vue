@@ -324,6 +324,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useNovelStore } from '../stores/novel.js'
 import apiService from '../services/api.js'
+import { listProviders, createProvider, updateProvider, getSettings, updateSettings } from '@/services/workspaceApi'
 
 const store = useNovelStore()
 const validating = ref(false)
@@ -439,19 +440,52 @@ const handleOfficialUnlimitedTokensChange = () => {
   if (officialForm.unlimitedTokens) {
     officialForm.maxTokens = null
   } else {
-    officialForm.maxTokens = 2000000
+    officialForm.maxTokens = 4096
   }
 }
 
 const saveOfficialConfig = async () => {
   validating.value = true
   try {
+    // 保存到后端
+    const providers = await listProviders()
+    const existing = providers.find(p => p.provider === 'OPENAI' && p.name === '91写作官方')
+    const providerData = {
+      provider: 'OPENAI',
+      name: '91写作官方',
+      baseUrl: officialForm.baseURL || null,
+      apiKey: officialForm.apiKey || null,
+      model: officialForm.selectedModel,
+      isDefault: true,
+      isEnabled: true
+    }
+    if (existing) {
+      await updateProvider(existing.id, providerData)
+    } else {
+      await createProvider(providerData)
+    }
+
+    // 保存配置偏好到 settings
+    const settings = await getSettings()
+    const data = settings?.data || {}
+    data.officialApiConfig = {
+      selectedModel: officialForm.selectedModel,
+      maxTokens: officialForm.maxTokens,
+      unlimitedTokens: officialForm.unlimitedTokens,
+      temperature: officialForm.temperature
+    }
+    data.apiConfigType = 'official'
+    await updateSettings(data)
+
+    // 同步到 localStorage 缓存
+    setItem('officialApiConfig', JSON.stringify(officialForm))
+    setItem('apiConfigType', 'official')
+
     store.updateApiConfig(officialForm, 'official')
     store.switchConfigType('official')
-    setItem('officialApiConfig', JSON.stringify(officialForm))
     ElMessage.success('配置保存成功')
   } catch (error) {
-    ElMessage.error('配置保存失败：' + error.message)
+    ElMessage.error('配置保存失败：' + (error.response?.data?.message || error.message))
   } finally {
     validating.value = false
   }
@@ -475,7 +509,7 @@ const handleCustomUnlimitedTokensChange = () => {
   if (customForm.unlimitedTokens) {
     customForm.maxTokens = null
   } else {
-    customForm.maxTokens = 2000000
+    customForm.maxTokens = 4096
   }
 }
 
@@ -532,12 +566,49 @@ const loadCustomModels = () => {
 const saveCustomConfig = async () => {
   validating.value = true
   try {
+    // 保存到后端 Provider
+    const providers = await listProviders()
+    const existing = providers.find(p => p.provider === 'CUSTOM' && p.name === '自定义配置')
+    const providerData = {
+      provider: 'CUSTOM',
+      name: '自定义配置',
+      baseUrl: customForm.baseURL || null,
+      apiKey: customForm.apiKey || null,
+      model: customForm.selectedModel,
+      isDefault: configType.value === 'custom',
+      isEnabled: true
+    }
+    if (existing) {
+      await updateProvider(existing.id, providerData)
+    } else {
+      await createProvider(providerData)
+    }
+
+    // 保存配置偏好和自定义模型到 settings
+    const settings = await getSettings()
+    const data = settings?.data || {}
+    data.customApiConfig = {
+      selectedModel: customForm.selectedModel,
+      maxTokens: customForm.maxTokens,
+      unlimitedTokens: customForm.unlimitedTokens,
+      temperature: customForm.temperature,
+      baseURL: customForm.baseURL,
+      apiKey: customForm.apiKey
+    }
+    data.customModels = customModels.value
+    data.apiConfigType = 'custom'
+    await updateSettings(data)
+
+    // 同步到 localStorage 缓存
+    setItem('customApiConfig', JSON.stringify(customForm))
+    setItem('customModels', JSON.stringify(customModels.value))
+    setItem('apiConfigType', 'custom')
+
     store.updateApiConfig(customForm, 'custom')
     store.switchConfigType('custom')
-    setItem('customApiConfig', JSON.stringify(customForm))
     ElMessage.success('自定义配置保存成功')
   } catch (error) {
-    ElMessage.error('配置保存失败：' + error.message)
+    ElMessage.error('配置保存失败：' + (error.response?.data?.message || error.message))
   } finally {
     validating.value = false
   }
@@ -569,66 +640,107 @@ const resetCustomConfig = () => {
   ElMessage.success('自定义配置已重置')
 }
 
-// 加载保存的配置
-const loadSavedConfig = () => {
-  // 加载配置类型
-  const savedType = getItem('apiConfigType') || 'official'
-  configType.value = savedType
-  
-  // 加载官方配置 - 只允许加载API密钥，其他参数保持默认值
-  const savedOfficial = getItem('officialApiConfig')
-  if (savedOfficial) {
-    try {
-      const config = JSON.parse(savedOfficial)
-      // 官方配置只允许覆盖API密钥，其他参数（特别是baseURL）保持默认值
-      if (config.apiKey) {
-        officialForm.apiKey = config.apiKey
-      }
-      // 其他参数可以覆盖，但baseURL必须保持官方地址
-      if (config.selectedModel) {
-        officialForm.selectedModel = config.selectedModel
-      }
-      if (config.maxTokens !== undefined) {
-        officialForm.maxTokens = config.maxTokens
-      }
-      if (config.unlimitedTokens !== undefined) {
-        officialForm.unlimitedTokens = config.unlimitedTokens
-      } else if (config.maxTokens === null) {
-        officialForm.unlimitedTokens = true
-      }
-      if (config.temperature !== undefined) {
-        officialForm.temperature = config.temperature
-      }
-      // 强制保持官方API地址，不允许被覆盖
-      officialForm.baseURL = 'https://ai.91hub.vip/v1'
-    } catch (error) {
-      console.error('加载官方配置失败:', error)
+// 加载保存的配置（从后端，fallback 到 localStorage）
+const loadSavedConfig = async () => {
+  try {
+    // 从后端加载
+    const settings = await getSettings()
+    const data = settings?.data || {}
+
+    // 加载配置类型
+    const savedType = data.apiConfigType || getItem('apiConfigType') || 'official'
+    configType.value = savedType
+
+    // 加载官方配置
+    const officialSettings = data.officialApiConfig
+    if (officialSettings) {
+      if (officialSettings.apiKey) officialForm.apiKey = officialSettings.apiKey
+      if (officialSettings.selectedModel) officialForm.selectedModel = officialSettings.selectedModel
+      if (officialSettings.maxTokens !== undefined) officialForm.maxTokens = officialSettings.maxTokens
+      if (officialSettings.unlimitedTokens !== undefined) officialForm.unlimitedTokens = officialSettings.unlimitedTokens
+      if (officialSettings.temperature !== undefined) officialForm.temperature = officialSettings.temperature
     }
-  }
-  
-  // 加载自定义配置 - 完全独立的数据源
-  const savedCustom = getItem('customApiConfig')
-  if (savedCustom) {
-    try {
-      const config = JSON.parse(savedCustom)
-      if (config.unlimitedTokens === undefined) {
-        config.unlimitedTokens = config.maxTokens === null
+    // Fallback to localStorage
+    if (!officialSettings) {
+      const savedOfficial = getItem('officialApiConfig')
+      if (savedOfficial) {
+        try {
+          const config = JSON.parse(savedOfficial)
+          if (config.apiKey) officialForm.apiKey = config.apiKey
+          if (config.selectedModel) officialForm.selectedModel = config.selectedModel
+          if (config.maxTokens !== undefined) officialForm.maxTokens = config.maxTokens
+          if (config.unlimitedTokens !== undefined) officialForm.unlimitedTokens = config.unlimitedTokens
+          else if (config.maxTokens === null) officialForm.unlimitedTokens = true
+          if (config.temperature !== undefined) officialForm.temperature = config.temperature
+        } catch { /* ignore */ }
       }
-      Object.assign(customForm, config)
-    } catch (error) {
-      console.error('加载自定义配置失败:', error)
     }
+    // 强制保持官方API地址
+    officialForm.baseURL = 'https://ai.91hub.vip/v1'
+
+    // 加载自定义配置
+    const customSettings = data.customApiConfig
+    if (customSettings) {
+      Object.assign(customForm, customSettings)
+      if (customSettings.unlimitedTokens === undefined) {
+        customForm.unlimitedTokens = customSettings.maxTokens === null
+      }
+    }
+    // Fallback to localStorage
+    if (!customSettings) {
+      const savedCustom = getItem('customApiConfig')
+      if (savedCustom) {
+        try {
+          const config = JSON.parse(savedCustom)
+          if (config.unlimitedTokens === undefined) {
+            config.unlimitedTokens = config.maxTokens === null
+          }
+          Object.assign(customForm, config)
+        } catch { /* ignore */ }
+      }
+    }
+
+    // 加载自定义模型列表
+    if (data.customModels && Array.isArray(data.customModels)) {
+      customModels.value = data.customModels
+    } else {
+      loadCustomModels() // fallback to localStorage
+    }
+  } catch (error) {
+    console.error('从后端加载配置失败，使用本地缓存:', error)
+    // Fallback to localStorage
+    const savedType = getItem('apiConfigType') || 'official'
+    configType.value = savedType
+    const savedOfficial = getItem('officialApiConfig')
+    if (savedOfficial) {
+      try {
+        const config = JSON.parse(savedOfficial)
+        if (config.apiKey) officialForm.apiKey = config.apiKey
+        if (config.selectedModel) officialForm.selectedModel = config.selectedModel
+        if (config.maxTokens !== undefined) officialForm.maxTokens = config.maxTokens
+        if (config.temperature !== undefined) officialForm.temperature = config.temperature
+      } catch { /* ignore */ }
+    }
+    officialForm.baseURL = 'https://ai.91hub.vip/v1'
+    const savedCustom = getItem('customApiConfig')
+    if (savedCustom) {
+      try {
+        const config = JSON.parse(savedCustom)
+        if (config.unlimitedTokens === undefined) config.unlimitedTokens = config.maxTokens === null
+        Object.assign(customForm, config)
+      } catch { /* ignore */ }
+    }
+    loadCustomModels()
   }
-  
-  // 应用当前配置类型的配置到store
+
+  // 应用当前配置到 store
   const currentForm = configType.value === 'official' ? officialForm : customForm
   store.updateApiConfig(currentForm, configType.value)
   store.switchConfigType(configType.value)
 }
 
-onMounted(() => {
-  loadCustomModels()
-  loadSavedConfig()
+onMounted(async () => {
+  await loadSavedConfig()
 })
 </script>
 

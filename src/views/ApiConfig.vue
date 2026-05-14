@@ -762,7 +762,7 @@ const handleUnlimitedTokensChange = (config) => {
   if (config.unlimitedTokens) {
     config.maxTokens = null
   } else {
-    config.maxTokens = 2000000 // 恢复到用户设定的默认值
+    config.maxTokens = 4096 // 恢复到默认值
   }
 }
 

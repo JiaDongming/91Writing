@@ -203,6 +203,7 @@ import AnnouncementDialog from '@/components/AnnouncementDialog.vue'
 import { getLatestAnnouncement } from '@/config/announcements.js'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
+import { listProviders, getSettings, updateSettings } from '@/services/workspaceApi'
 
 const router = useRouter()
 const route = useRoute()
@@ -217,7 +218,6 @@ const currentAnnouncement = ref({})
 const activeMenu = ref('/')
 const currentModel = ref('')
 const configType = ref('official')
-const forceUpdate = ref(0) // 用于强制更新计算属性
 
 // 计算属性
 const isApiConfigured = computed(() => novelStore.isApiConfigured)
@@ -255,66 +255,32 @@ const officialModels = computed(() => [
   }
 ])
 
-// 自定义模型列表（从API配置中读取）
-const customModels = computed(() => {
-  // 依赖于 forceUpdate 来强制重新计算
-  forceUpdate.value
-  
-  const models = []
-  
+// 自定义模型列表
+const customModels = ref([])
+
+const defaultCustomModels = [
+  { id: 'deepseek-reasoner', name: 'deepseek-r1', description: '深度思考推理模型' },
+  { id: 'deepseek-chat', name: 'deepseek-v3', description: '深度求索对话模型' },
+  { id: 'gpt-4o', name: 'GPT-4o', description: 'OpenAI最新多模态模型' },
+  { id: 'gpt-4o-mini', name: 'GPT-4o mini', description: 'GPT-4o轻量版本' },
+  { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo', description: 'OpenAI经典对话模型' }
+]
+
+const loadCustomModels = () => {
+  const models = [...defaultCustomModels]
   try {
-    // 从ApiConfig组件的配置中读取自定义模型
-    const savedCustomModels = getItem('customModels')
-    if (savedCustomModels) {
-      const parsed = JSON.parse(savedCustomModels)
-      models.push(...parsed)
-    }
-    
-    // 添加一些默认的自定义模型选项
-    const defaultCustomModels = [
-      {
-        id: 'deepseek-reasoner',
-        name: 'deepseek-r1',
-        description: '深度思考推理模型'
-      },
-      {
-        id: 'deepseek-chat',
-        name: 'deepseek-v3',
-        description: '深度求索对话模型'
-      },
-      {
-        id: 'gpt-4o',
-        name: 'GPT-4o',
-        description: 'OpenAI最新多模态模型'
-      },
-      {
-        id: 'gpt-4o-mini',
-        name: 'GPT-4o mini',
-        description: 'GPT-4o轻量版本'
-      },
-      {
-        id: 'gpt-3.5-turbo',
-        name: 'GPT-3.5 Turbo',
-        description: 'OpenAI经典对话模型'
-      }
-    ]
-    
-    // 合并默认模型和自定义模型，去重
-    const allModels = [...defaultCustomModels]
-    for (const model of models) {
-      if (!allModels.find(m => m.id === model.id)) {
-        allModels.push(model)
+    const saved = getItem('customModels')
+    if (saved) {
+      const parsed = JSON.parse(saved)
+      for (const model of parsed) {
+        if (!models.find(m => m.id === model.id)) {
+          models.push(model)
+        }
       }
     }
-    
-    console.log('自定义模型列表:', allModels) // 调试日志
-    return allModels
-    
-  } catch (error) {
-    console.error('读取自定义模型失败:', error)
-    return []
-  }
-})
+  } catch { /* ignore */ }
+  customModels.value = models
+}
 
 const pageTitle = computed(() => {
   const titleMap = {
@@ -333,30 +299,17 @@ const pageTitle = computed(() => {
   return titleMap[route.path] || '首页'
 })
 
-// 获取当前配置类型的函数
+// 获取当前配置类型
 const getCurrentConfigType = () => {
   try {
-    // 从localStorage获取配置类型
     const savedConfigType = getItem('apiConfigType')
-    console.log('从localStorage获取的配置类型:', savedConfigType) // 调试日志
-    
-    // 如果没有保存的配置类型，尝试通过API地址判断
     if (!savedConfigType && isApiConfigured.value && currentApiConfig.value) {
       const baseURL = currentApiConfig.value.baseURL
-      console.log('API地址:', baseURL) // 调试日志
-      
-      if (baseURL && baseURL.includes('91hub.vip')) {
-        console.log('通过API地址判断为官方配置') // 调试日志
-        return 'official'
-      } else {
-        console.log('通过API地址判断为自定义配置') // 调试日志
-        return 'custom'
-      }
+      if (baseURL && baseURL.includes('91hub.vip')) return 'official'
+      return 'custom'
     }
-    
     return savedConfigType || 'official'
-  } catch (error) {
-    console.error('获取配置类型失败:', error)
+  } catch {
     return 'official'
   }
 }
@@ -390,140 +343,145 @@ const handleAnnouncementClose = () => {
 }
 
 // 模型相关功能
-const handleModelChange = (modelId) => {
+const handleModelChange = async (modelId) => {
   try {
-    console.log('切换模型:', modelId) // 调试日志
-    
-    // 判断选择的是官方模型还是自定义模型
     const isOfficialModel = officialModels.value.find(m => m.id === modelId)
     const isCustomModel = customModels.value.find(m => m.id === modelId)
-    
+
     let newConfig = {}
     let newConfigType = ''
-    
+
     if (isOfficialModel) {
-      console.log('选择了官方模型，切换到官方配置') // 调试日志
-      // 选择了官方模型，切换到官方配置
       newConfigType = 'official'
-      
-      // 加载官方配置的基础参数
       const savedOfficialConfig = getItem('officialApiConfig')
       if (savedOfficialConfig) {
         newConfig = JSON.parse(savedOfficialConfig)
       } else {
-        // 如果没有保存的官方配置，使用默认值
         newConfig = {
           baseURL: 'https://ai.91hub.vip/v1',
           maxTokens: 4096,
           unlimitedTokens: false,
           temperature: 0.7,
-          apiKey: '' // 需要用户配置
+          apiKey: ''
         }
       }
       newConfig.selectedModel = modelId
-      
-      // 保存配置类型
       setItem('apiConfigType', 'official')
-      // 保存官方配置
       setItem('officialApiConfig', JSON.stringify(newConfig))
-      
+
     } else if (isCustomModel) {
-      console.log('选择了自定义模型，切换到自定义配置') // 调试日志
-      // 选择了自定义模型，切换到自定义配置
       newConfigType = 'custom'
-      
-      // 加载自定义配置的基础参数
       const savedCustomConfig = getItem('customApiConfig')
       if (savedCustomConfig) {
         newConfig = JSON.parse(savedCustomConfig)
       } else {
-        // 如果没有保存的自定义配置，使用默认值
         newConfig = {
           baseURL: 'https://api.openai.com/v1',
           maxTokens: 4096,
           unlimitedTokens: false,
           temperature: 0.7,
-          apiKey: '' // 需要用户配置
+          apiKey: ''
         }
       }
       newConfig.selectedModel = modelId
-      
-      // 保存配置类型
       setItem('apiConfigType', 'custom')
-      // 保存自定义配置
       setItem('customApiConfig', JSON.stringify(newConfig))
-      
+
     } else {
-      console.error('未知的模型类型:', modelId)
       ElMessage.error('未知的模型类型')
       return
     }
-    
-    // 更新当前配置类型
+
     configType.value = newConfigType
-    
-    // 更新store中的API配置，使用新的分离配置系统
     novelStore.updateApiConfig(newConfig, newConfigType)
     novelStore.switchConfigType(newConfigType)
-    
-    // 强制更新界面
-    forceUpdate.value++
-    
+
+    // 保存到后端 settings
+    try {
+      const settings = await getSettings()
+      const data = settings?.data || {}
+      data.apiConfigType = newConfigType
+      if (newConfigType === 'official') {
+        data.officialApiConfig = {
+          selectedModel: newConfig.selectedModel,
+          maxTokens: newConfig.maxTokens,
+          unlimitedTokens: newConfig.unlimitedTokens,
+          temperature: newConfig.temperature
+        }
+      } else {
+        data.customApiConfig = {
+          selectedModel: newConfig.selectedModel,
+          maxTokens: newConfig.maxTokens,
+          unlimitedTokens: newConfig.unlimitedTokens,
+          temperature: newConfig.temperature,
+          baseURL: newConfig.baseURL,
+          apiKey: newConfig.apiKey
+        }
+      }
+      await updateSettings(data)
+    } catch { /* backend save optional */ }
+
     const modelName = getModelDisplayName(modelId)
     const configTypeName = newConfigType === 'official' ? '官方配置' : '自定义配置'
-    
-    // 检查是否需要配置API密钥
     const needsApiKey = !newConfig.apiKey || newConfig.apiKey.trim() === ''
-    
+
     if (needsApiKey) {
       ElMessage.warning(`已切换到${configTypeName}: ${modelName}，请先配置API密钥`)
-      // 可以考虑自动打开API配置对话框
-      setTimeout(() => {
-        showApiConfig.value = true
-      }, 1000)
+      setTimeout(() => { showApiConfig.value = true }, 1000)
     } else {
       ElMessage.success(`已切换到${configTypeName}: ${modelName}`)
     }
-    
-    console.log('配置切换完成:', { configType: newConfigType, config: newConfig, needsApiKey }) // 调试日志
-    
   } catch (error) {
-    console.error('切换模型失败:', error)
     ElMessage.error('切换模型失败: ' + error.message)
   }
 }
 
 const getModelDisplayName = (modelId) => {
-  // 先在官方模型中查找
   let model = officialModels.value.find(m => m.id === modelId)
   if (model) return model.name
-  
-  // 再在自定义模型中查找
   model = customModels.value.find(m => m.id === modelId)
   if (model) return model.name
-  
-  // 都找不到就返回原ID
   return modelId
 }
 
-// 初始化模型选择器
-const initializeModelSelector = () => {
+// 初始化模型选择器（从后端加载）
+const initializeModelSelector = async () => {
   try {
-    // 获取配置类型
-    const savedConfigType = getItem('apiConfigType') || 'official'
+    // 从后端加载 settings
+    let data = {}
+    try {
+      const settings = await getSettings()
+      data = settings?.data || {}
+    } catch { /* use localStorage fallback */ }
+
+    // 加载配置类型
+    const savedConfigType = data.apiConfigType || getItem('apiConfigType') || 'official'
     configType.value = savedConfigType
-    
+
+    // 加载自定义模型列表
+    if (data.customModels && Array.isArray(data.customModels)) {
+      const models = [...defaultCustomModels]
+      for (const model of data.customModels) {
+        if (!models.find(m => m.id === model.id)) {
+          models.push(model)
+        }
+      }
+      customModels.value = models
+    } else {
+      loadCustomModels()
+    }
+
     // 获取当前选中的模型
     if (isApiConfigured.value && currentApiConfig.value) {
       currentModel.value = currentApiConfig.value.selectedModel || ''
     }
-    
-    // 强制更新模型列表
-    forceUpdate.value++
-    
-    console.log('模型选择器初始化完成, 配置类型:', savedConfigType, '当前模型:', currentModel.value) // 调试日志
-  } catch (error) {
-    console.error('初始化模型选择器失败:', error)
+  } catch {
+    // Fallback to localStorage
+    configType.value = getItem('apiConfigType') || 'official'
+    if (isApiConfigured.value && currentApiConfig.value) {
+      currentModel.value = currentApiConfig.value.selectedModel || ''
+    }
+    loadCustomModels()
   }
 }
 
@@ -537,46 +495,14 @@ watch(() => [isApiConfigured.value, currentApiConfig.value], () => {
   initializeModelSelector()
 }, { immediate: true })
 
-// 监听localStorage变化的函数
-const handleStorageChange = (event) => {
-  if (event.key === 'apiConfigType' || event.key === 'officialApiConfig' || event.key === 'customApiConfig' || event.key === 'customModels') {
-    console.log('检测到localStorage配置变化:', event.key, event.newValue) // 调试日志
-    // 延迟执行，确保数据已更新
-    setTimeout(() => {
-      initializeModelSelector()
-    }, 100)
-  }
-}
-
 // 组件挂载时初始化
-onMounted(() => {
-  initializeModelSelector()
-  // 监听localStorage变化
-  window.addEventListener('storage', handleStorageChange)
-  
-  // 手动触发一次检查（处理同页面内的变化）
-  const checkConfigChange = () => {
-    const currentType = getItem('apiConfigType')
-    if (currentType !== configType.value) {
-      console.log('检测到配置类型变化:', configType.value, '->', currentType)
-      initializeModelSelector()
-    }
-  }
-  
-  // 定期检查配置变化（处理同页面内的localStorage变化）
-  const intervalId = setInterval(checkConfigChange, 1000)
-  
-  // 保存interval ID以便清理
-  window.modelSelectorInterval = intervalId
+onMounted(async () => {
+  await initializeModelSelector()
 })
 
 // 组件卸载时清理
 onUnmounted(() => {
   window.removeEventListener('storage', handleStorageChange)
-  if (window.modelSelectorInterval) {
-    clearInterval(window.modelSelectorInterval)
-    delete window.modelSelectorInterval
-  }
 })
 
 </script>

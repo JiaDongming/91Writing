@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import apiService from '../services/api.js'
 import { getItem, setItem, removeItem } from '@/services/storageCompat'
+import { getSettings } from '@/services/workspaceApi'
 
 export const useNovelStore = defineStore('novel', () => {
   // 状态
@@ -85,8 +86,48 @@ export const useNovelStore = defineStore('novel', () => {
     }
   }
 
-  // 立即执行初始化
+  // 立即执行初始化（从 localStorage 同步加载，快速启动）
   initializeApiConfig()
+
+  // 从后端恢复 API 配置（异步，覆盖 localStorage 缓存）
+  const initFromBackend = async () => {
+    try {
+      const settings = await getSettings()
+      const data = settings?.data || {}
+
+      if (data.apiConfigType) {
+        currentConfigType.value = data.apiConfigType
+      }
+
+      if (data.officialApiConfig) {
+        const c = data.officialApiConfig
+        if (c.selectedModel) officialApiConfig.value.selectedModel = c.selectedModel
+        if (c.temperature !== undefined) officialApiConfig.value.temperature = c.temperature
+        if (c.maxTokens !== undefined) officialApiConfig.value.maxTokens = c.maxTokens
+        if (c.unlimitedTokens !== undefined) officialApiConfig.value.unlimitedTokens = c.unlimitedTokens
+      }
+
+      if (data.customApiConfig) {
+        const c = data.customApiConfig
+        if (c.selectedModel) customApiConfig.value.selectedModel = c.selectedModel
+        if (c.temperature !== undefined) customApiConfig.value.temperature = c.temperature
+        if (c.maxTokens !== undefined) customApiConfig.value.maxTokens = c.maxTokens
+        if (c.unlimitedTokens !== undefined) customApiConfig.value.unlimitedTokens = c.unlimitedTokens
+        if (c.baseURL !== undefined) customApiConfig.value.baseURL = c.baseURL
+        if (c.apiKey !== undefined) customApiConfig.value.apiKey = c.apiKey
+      }
+
+      // 同步到 localStorage 缓存
+      if (data.apiConfigType) setItem('apiConfigType', data.apiConfigType)
+      if (data.officialApiConfig) setItem('officialApiConfig', JSON.stringify(data.officialApiConfig))
+      if (data.customApiConfig) setItem('customApiConfig', JSON.stringify(data.customApiConfig))
+
+      const currentConfig = getCurrentApiConfig()
+      apiService.updateConfig(currentConfig)
+    } catch {
+      // 后端不可用时，依赖 localStorage 缓存
+    }
+  }
   
   // 摘要功能
   const articleSummary = ref('')
@@ -791,6 +832,7 @@ export const useNovelStore = defineStore('novel', () => {
     updateStats,
     
     // API相关方法
+    initFromBackend,
     updateApiConfig,
     switchConfigType,
     getCurrentApiConfig,
