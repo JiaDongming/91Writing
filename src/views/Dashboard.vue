@@ -151,15 +151,15 @@
           <el-dropdown v-if="authStore.isLoggedIn" trigger="click">
             <span class="user-info">
               <el-icon><User /></el-icon>
-              <span class="user-name">{{ authStore.user?.nickname || '用户' }}</span>
+              <span class="user-detail">
+                <span class="user-name">{{ authStore.user?.nickname || '用户' }}</span>
+                <span class="user-email">{{ authStore.user?.email }}</span>
+              </span>
               <el-icon><ArrowDown /></el-icon>
             </span>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item disabled>
-                  {{ authStore.user?.email }}
-                </el-dropdown-item>
-                <el-dropdown-item divided @click="handleLogout">
+                <el-dropdown-item @click="handleLogout">
                   退出登录
                 </el-dropdown-item>
               </el-dropdown-menu>
@@ -575,18 +575,39 @@ onUnmounted(() => {
 .user-info {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   cursor: pointer;
+  padding: 4px 10px;
+  border-radius: 4px;
+  transition: background-color 0.3s;
   color: #606266;
   font-size: 14px;
 }
 
 .user-info:hover {
-  color: #409eff;
+  background-color: #f5f7fa;
+}
+
+.user-detail {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
 }
 
 .user-name {
-  max-width: 80px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #303133;
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-email {
+  font-size: 11px;
+  color: #909399;
+  max-width: 140px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -607,25 +628,6 @@ onUnmounted(() => {
 
 .model-selector :deep(.el-option-group:not(:last-child)) {
   border-bottom: 1px solid #e4e7ed;
-}
-
-.user-info {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  padding: 5px 10px;
-  border-radius: 4px;
-  transition: background-color 0.3s;
-}
-
-.user-info:hover {
-  background-color: #f5f7fa;
-}
-
-.username {
-  color: #606266;
-  font-size: 14px;
 }
 
 .content {

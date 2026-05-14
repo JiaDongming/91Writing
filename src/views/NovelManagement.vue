@@ -679,7 +679,7 @@ const filteredNovels = computed(() => {
 })
 
 // 方法
-const getStatusType = async (status) => {
+const getStatusType = (status) => {
   const types = {
     writing: 'success',
     completed: 'info',
@@ -688,7 +688,7 @@ const getStatusType = async (status) => {
   return types[status] || 'info'
 }
 
-const getStatusText = async (status) => {
+const getStatusText = (status) => {
   const texts = {
     writing: '创作中',
     completed: '已完成',
@@ -697,7 +697,7 @@ const getStatusText = async (status) => {
   return texts[status] || '未知'
 }
 
-const getGenreDisplayName = async (genreCode) => {
+const getGenreDisplayName = (genreCode) => {
   return genrePresets.value[genreCode]?.name || genreCode || '未知'
 }
 
@@ -766,14 +766,14 @@ const updateGenreUsageCount = async (genreCode) => {
   // 使用计数由后端 TokenUsage / Novel 创建记录自动统计
 }
 
-const formatNumber = async (num) => {
+const formatNumber = (num) => {
   if (num >= 10000) {
     return (num / 10000).toFixed(1) + '万'
   }
   return num.toLocaleString()
 }
 
-const formatDate = async (date) => {
+const formatDate = (date) => {
   return new Date(date).toLocaleDateString('zh-CN')
 }
 

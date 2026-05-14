@@ -691,11 +691,10 @@
                   <span class="config-title">⚙️ 生成配置</span>
                   <el-tag type="info" size="small">{{ currentChapter?.title || '未选择章节' }}</el-tag>
                 </div>
-                <el-button 
-                  type="primary" 
-                  @click="generateChapterContentWithDialog" 
+                <el-button
+                  type="primary"
+                  @click="generateChapterContentWithDialog"
                   :loading="isGeneratingContent"
-                  :disabled="!selectedPrompt"
                   size="small"
                 >
                   <el-icon><MagicStick /></el-icon>
@@ -1046,11 +1045,10 @@
         <div class="dialog-footer">
           <div class="action-buttons">
             <el-button @click="showChapterGenerateDialog = false">取消</el-button>
-            <el-button 
-              type="primary" 
-              @click="generateChapterContentWithDialog" 
+            <el-button
+              type="primary"
+              @click="generateChapterContentWithDialog"
               :loading="isGeneratingContent"
-              :disabled="!selectedPrompt"
             >
               <el-icon><MagicStick /></el-icon>
               {{ isGeneratingContent ? '生成中...' : '开始生成' }}
@@ -2135,7 +2133,7 @@ import '@wangeditor/editor/dist/css/style.css'
 import apiService from '../services/api.js'
 import billingService from '../services/billing.js'
 import { useNovelStore } from '../stores/novel.js'
-import { getNovel, updateNovel } from '@/services/novelApi'
+import { getNovel, updateNovel, createChapter, updateChapter, deleteChapter as deleteChapterApi } from '@/services/novelApi'
 import { listPrompts, createPrompt, updatePrompt, deletePrompt } from '@/services/workspaceApi'
 
 const route = useRoute()
@@ -2146,21 +2144,8 @@ const novelStore = useNovelStore()
 
 // 检查API配置
 const checkApiConfig = () => {
-  const config = apiService.getConfig()
-  if (!config.apiKey || !config.baseURL) {
-    ElMessageBox.confirm(
-      '检测到您还未配置AI API，需要先配置API密钥才能使用AI功能。是否前往配置？',
-      '需要配置API',
-      {
-        confirmButtonText: '去配置',
-        cancelButtonText: '稍后配置',
-        type: 'warning'
-      }
-    ).then(() => {
-      router.push('/config')
-    }).catch(() => {
-      // 用户选择稍后配置
-    })
+  if (!localStorage.getItem('accessToken')) {
+    ElMessage.error('请先登录后再使用AI功能')
     return false
   }
   return true
@@ -2470,6 +2455,12 @@ const saveCurrentChapter = () => {
     currentChapter.value.content = content.value
     currentChapter.value.wordCount = contentWordCount.value
     currentChapter.value.updatedAt = new Date()
+    try {
+      updateChapter(currentChapter.value.id, {
+        content: content.value,
+        wordCount: contentWordCount.value
+      })
+    } catch (e) { console.error('保存章节内容失败:', e) }
     saveNovelData()
   }
 }
@@ -2494,7 +2485,7 @@ const editChapterTitle = (chapter) => {
   showChapterDialog.value = true
 }
 
-const saveChapter = () => {
+const saveChapter = async () => {
   if (!chapterForm.value.title.trim()) {
     ElMessage.warning('请输入章节标题')
     return
@@ -2505,44 +2496,71 @@ const saveChapter = () => {
     editingChapter.value.title = chapterForm.value.title
     editingChapter.value.description = chapterForm.value.description
     editingChapter.value.status = chapterForm.value.status
+    try {
+      await updateChapter(editingChapter.value.id, {
+        title: chapterForm.value.title,
+        outlineContent: chapterForm.value.description,
+        status: chapterForm.value.status === 'draft' ? 'DRAFT' : 'GENERATED'
+      })
+    } catch (e) { console.error('更新章节失败:', e) }
     ElMessage.success('章节信息已更新')
   } else {
     // 新增章节
-    const newChapter = {
-      id: Date.now(),
-      title: chapterForm.value.title,
-      description: chapterForm.value.description,
-      content: '',
-      wordCount: 0,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      status: chapterForm.value.status
+    try {
+      const sortOrder = chapters.value.length + 1
+      const created = await createChapter(currentNovel.value.id, {
+        title: chapterForm.value.title,
+        content: '',
+        outlineContent: chapterForm.value.description,
+        wordCount: 0,
+        sortOrder,
+        status: 'DRAFT'
+      })
+      const newChapter = {
+        ...created,
+        id: created.id,
+        title: created.title,
+        description: created.outlineContent || '',
+        content: created.content || '',
+        wordCount: created.wordCount || 0,
+        createdAt: new Date(created.createdAt),
+        updatedAt: new Date(created.updatedAt),
+        status: (created.status || 'DRAFT').toLowerCase()
+      }
+      chapters.value.push(newChapter)
+      ElMessage.success('章节创建成功')
+
+      // 自动选择新章节
+      setTimeout(() => {
+        selectChapter(newChapter)
+      }, 100)
+    } catch (e) {
+      console.error('创建章节失败:', e)
+      ElMessage.error('章节创建失败: ' + (e.response?.data?.message || e.message))
     }
-    chapters.value.push(newChapter)
-    ElMessage.success('章节创建成功')
-    
-    // 自动选择新章节
-    setTimeout(() => {
-      selectChapter(newChapter)
-    }, 100)
   }
-  
+
   showChapterDialog.value = false
+  saveNovelData()
 }
 
 const deleteChapter = (chapter) => {
   ElMessageBox.confirm(`确定要删除章节《${chapter.title}》吗？`, '确认删除', {
     type: 'warning'
-  }).then(() => {
+  }).then(async () => {
     const index = chapters.value.findIndex(c => c.id === chapter.id)
     if (index > -1) {
+      try {
+        await deleteChapterApi(chapter.id)
+      } catch (e) { console.error('删除章节失败:', e) }
+
       chapters.value.splice(index, 1)
-      
+
       // 如果删除的是当前章节
       if (currentChapter.value?.id === chapter.id) {
         currentChapter.value = null
         content.value = ''
-        
+
         // 如果还有其他章节，自动选择第一个章节
         if (chapters.value.length > 0) {
           setTimeout(() => {
@@ -2550,8 +2568,7 @@ const deleteChapter = (chapter) => {
           }, 100)
         }
       }
-      
-      // 保存数据到localStorage，确保删除操作持久化
+
       saveNovelData()
       ElMessage.success('章节已删除')
     }
@@ -3697,6 +3714,14 @@ const openChapterGenerateDialog = (chapter) => {
   selectedPrompt.value = null
   promptVariables.value = {}
   finalPrompt.value = ''
+
+  // 自动选中第一个可用提示词
+  nextTick(() => {
+    const prompts = getPromptsByCategory(selectedContentCategory.value)
+    if (prompts.length > 0 && !selectedPrompt.value) {
+      selectPromptForChapter(prompts[0])
+    }
+  })
 }
 
 // 自动填充变量
@@ -7957,24 +7982,51 @@ const previewGenerate = () => {
 }
 
 const generateChapterContentWithDialog = async () => {
-  if (!selectedPrompt.value) {
-    ElMessage.warning('请先选择提示词模板')
-    return
-  }
-  
-  if (!currentChapter.value) {
+  if (!targetChapter.value && !currentChapter.value) {
     ElMessage.warning('请先选择要生成内容的章节')
     return
   }
-  
+
   if (!checkApiAndBalance()) return
-  
+
+  const chapter = targetChapter.value || currentChapter.value
+
+  // 没有选中提示词时，使用表单配置自动构建默认 prompt
+  let prompt = finalPrompt.value
+  if (!selectedPrompt.value || !prompt) {
+    const wordCount = generateConfig.value.wordCount || 2000
+    const style = getViewpointDescription(generateConfig.value.style)
+    const focus = generateConfig.value.focus || '按大纲发展'
+
+    const materialChars = selectedMaterials.value.characters
+    const materialWorld = selectedMaterials.value.worldSettings
+
+    let materialText = ''
+    if (materialChars.length > 0) {
+      materialText += '\n\n主要人物：\n' + materialChars.map(c => `- ${c.name}（${c.role}）：${c.personality || '暂无描述'}`).join('\n')
+    }
+    if (materialWorld.length > 0) {
+      materialText += '\n\n世界观设定：\n' + materialWorld.map(w => `- ${w.title}：${w.description || '暂无描述'}`).join('\n')
+    }
+
+    prompt = `请为小说《${currentNovel.value?.title || ''}》的章节《${chapter.title || ''}》写正文内容。
+
+章节大纲：${chapter.description || '暂无大纲'}
+
+创作要求：
+1. 字数控制在${wordCount}字左右
+2. 采用${style}视角
+3. 突出重点：${focus}
+4. 包含丰富的对话、心理活动、环境描写${materialText}
+
+请直接输出章节正文内容：`
+  }
+
   isGeneratingContent.value = true
   showChapterGenerateDialog.value = false
-  
+
   try {
-    await generateContentWithPrompt(finalPrompt.value)
-    // 成功消息已在generateContentWithPrompt函数内部显示，这里不再重复显示
+    await generateContentWithPrompt(prompt)
   } catch (error) {
     console.error('生成失败:', error)
     ElMessage.error('生成失败: ' + error.message)
