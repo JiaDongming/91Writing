@@ -34,7 +34,7 @@
               >
                 <div class="novel-option">
                   <span class="novel-title">{{ novel.title }}</span>
-                  <span class="novel-info">{{ (novel.chapterList || []).length }}章 · {{ formatNumber(novel.wordCount || 0) }}字</span>
+                  <span class="novel-info">{{ novel._count?.chapters || 0 }}章 · {{ formatNumber(novel.wordCount || 0) }}字</span>
                 </div>
               </el-option>
             </el-select>
@@ -44,11 +44,11 @@
             <div class="novel-stats">
               <div class="stat-item">
                 <span class="stat-label">总章节：</span>
-                <span class="stat-value">{{ (selectedNovel.chapterList || []).length }}章</span>
+                <span class="stat-value">{{ chapters.length }}章</span>
               </div>
               <div class="stat-item">
                 <span class="stat-label">总字数：</span>
-                <span class="stat-value">{{ formatNumber(selectedNovel.wordCount || 0) }}字</span>
+                <span class="stat-value">{{ formatNumber(novelTotalWords) }}字</span>
               </div>
             </div>
           </div>
@@ -77,21 +77,21 @@
             :class="{ 'selected': selectedChapters.includes(chapter.id) }"
           >
             <div class="chapter-checkbox">
-              <el-checkbox 
-                v-model="selectedChapters"
-                :label="chapter.id"
+              <el-checkbox
+                :model-value="selectedChapters.includes(chapter.id)"
+                @change="(val) => toggleChapterSelect(chapter.id, val)"
               />
             </div>
-            
+
             <div class="chapter-number">
               第{{ index + 1 }}章
             </div>
-            
+
             <div class="chapter-content">
               <div class="chapter-title">
                 <h4>{{ chapter.title }}</h4>
                 <div class="chapter-status">
-                  <el-tag 
+                  <el-tag
                     :type="getChapterStatusType(chapter.status)"
                     size="small"
                   >
@@ -99,15 +99,15 @@
                   </el-tag>
                 </div>
               </div>
-              
+
               <div class="chapter-summary" v-if="chapter.summary">
                 {{ chapter.summary }}
               </div>
-              
+
               <div class="chapter-meta">
                 <div class="meta-item">
                   <el-icon><EditPen /></el-icon>
-                  <span>{{ chapter.wordCount }}字</span>
+                  <span>{{ formatNumber(chapter.wordCount || 0) }}字</span>
                 </div>
                 <div class="meta-item">
                   <el-icon><Calendar /></el-icon>
@@ -339,38 +339,50 @@ const loadNovels = async () => {
   }
 }
 
-const formatNumber = async (num) => {
+const formatNumber = (num) => {
   if (num >= 10000) {
     return (num / 10000).toFixed(1) + '万'
   }
   return num.toLocaleString()
 }
 
-const formatDate = async (date) => {
+const formatDate = (date) => {
+  if (!date) return ''
   return new Date(date).toLocaleDateString('zh-CN')
 }
 
-const getChapterStatusType = async (status) => {
+const getChapterStatusType = (status) => {
+  const s = (status || '').toLowerCase()
   const typeMap = {
     draft: '',
+    generated: 'warning',
     writing: 'warning',
+    reviewed: '',
     completed: 'success',
     published: 'info'
   }
-  return typeMap[status] || ''
+  return typeMap[s] || ''
 }
 
-const getChapterStatusText = async (status) => {
+const getChapterStatusText = (status) => {
+  const s = (status || '').toLowerCase()
   const textMap = {
     draft: '草稿',
+    generated: 'AI生成',
     writing: '写作中',
+    reviewed: '已审核',
     completed: '已完成',
     published: '已发布'
   }
-  return textMap[status] || '未知'
+  return textMap[s] || s || '未知'
 }
 
-const handleNovelChange = async (novelId) => {
+// 计算小说总字数（从章节汇总）
+const novelTotalWords = computed(() => {
+  return chapters.value.reduce((total, ch) => total + (ch.wordCount || 0), 0)
+})
+
+const handleNovelChange = (novelId) => {
   loadChapters(novelId)
 }
 
@@ -392,63 +404,64 @@ const loadChapters = async (novelId) => {
   }
 }
 
-const saveChaptersToNovel = async () => {
+const reloadChapters = async () => {
   if (!selectedNovelId.value) return
-  
   try {
-    // 重新加载小说数据以更新统计
-    await loadNovels()
     const novel = await getNovel(selectedNovelId.value)
-    if (novel) {
-      chapters.value = (novel.chapters || []).map(ch => ({
+    if (novel && novel.chapters) {
+      chapters.value = novel.chapters.map(ch => ({
         ...ch,
         createdAt: new Date(ch.createdAt),
         updatedAt: new Date(ch.updatedAt)
       }))
     }
+    await loadNovels()
   } catch (error) {
-    console.error('保存章节数据失败:', error)
-    ElMessage.error('保存失败')
+    console.error('加载章节失败:', error)
   }
 }
 
-const editChapter = async (chapter) => {
-  // 跳转到Writer页面进行编辑
+const editChapter = (chapter) => {
   router.push(`/writer?novelId=${selectedNovelId.value}&chapterId=${chapter.id}`)
 }
 
-const viewChapter = async (chapter) => {
+const viewChapter = (chapter) => {
   previewChapter.value = chapter
   showPreviewDialog.value = true
 }
 
 const duplicateChapter = async (chapter) => {
-  const newChapter = {
-    ...chapter,
-    id: Date.now(),
-    title: chapter.title + ' (副本)',
-    status: 'draft',
-    createdAt: new Date(),
-    updatedAt: new Date()
+  try {
+    await createChapter(selectedNovelId.value, {
+      title: chapter.title + ' (副本)',
+      summary: chapter.summary,
+      content: chapter.content,
+      wordCount: chapter.wordCount || 0,
+      sortOrder: chapters.value.length,
+      status: 'DRAFT'
+    })
+    await reloadChapters()
+    ElMessage.success('章节复制成功')
+  } catch (error) {
+    console.error('复制章节失败:', error)
+    ElMessage.error('复制失败')
   }
-  chapters.value.push(newChapter)
-  // 保存到localStorage
-  await saveChaptersToNovel()
-  ElMessage.success('章节复制成功')
 }
 
 const moveChapter = async (chapter, direction) => {
   const index = chapters.value.findIndex(c => c.id === chapter.id)
-  if (direction === 'up' && index > 0) {
-    [chapters.value[index], chapters.value[index - 1]] = [chapters.value[index - 1], chapters.value[index]]
-    // 保存到localStorage
-    await saveChaptersToNovel()
-    ElMessage.success('章节上移成功')
-  } else if (direction === 'down' && index < chapters.value.length - 1) {
-    [chapters.value[index], chapters.value[index + 1]] = [chapters.value[index + 1], chapters.value[index]]
-    // 保存到localStorage
-    await saveChaptersToNovel()
-    ElMessage.success('章节下移成功')
+  const swapIndex = direction === 'up' ? index - 1 : index + 1
+  if (swapIndex < 0 || swapIndex >= chapters.value.length) return
+
+  const target = chapters.value[swapIndex]
+  try {
+    await updateChapter(chapter.id, { sortOrder: target.sortOrder })
+    await updateChapter(target.id, { sortOrder: chapter.sortOrder })
+    await reloadChapters()
+    ElMessage.success('章节移动成功')
+  } catch (error) {
+    console.error('移动章节失败:', error)
+    ElMessage.error('移动失败')
   }
 }
 
@@ -462,58 +475,58 @@ const deleteChapter = async (chapter) => {
       type: 'warning'
     }
   ).then(async () => {
-    const index = chapters.value.findIndex(c => c.id === chapter.id)
-    if (index > -1) {
-      chapters.value.splice(index, 1)
-      // 保存到localStorage
-      await saveChaptersToNovel()
+    try {
+      await apiDeleteChapter(chapter.id)
+      await reloadChapters()
       ElMessage.success('章节删除成功')
+    } catch (error) {
+      console.error('删除章节失败:', error)
+      ElMessage.error('删除失败')
     }
-  })
+  }).catch(() => {})
 }
 
 const saveChapter = async () => {
-  chapterFormRef.value.validate(async (valid) => {
-    if (valid) {
-      const wordCount = chapterForm.value.content.replace(/<[^>]*>/g, '').length
-      
-      if (editingChapter.value) {
-        // 编辑现有章节
-        const index = chapters.value.findIndex(c => c.id === editingChapter.value.id)
-        if (index > -1) {
-          chapters.value[index] = {
-            ...chapters.value[index],
-            ...chapterForm.value,
-            wordCount,
-            updatedAt: new Date()
-          }
-        }
-        ElMessage.success('章节更新成功')
-      } else {
-        // 创建新章节
-        const newChapter = {
-          id: Date.now(),
-          ...chapterForm.value,
-          wordCount,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          aiGenerated: false,
-          status: chapterForm.value.status || 'draft'
-        }
-        chapters.value.push(newChapter)
-        ElMessage.success('章节创建成功')
-      }
-      
-      // 保存到localStorage
-      await saveChaptersToNovel()
-      
-      showCreateDialog.value = false
-      resetForm()
+  try {
+    await chapterFormRef.value.validate()
+  } catch {
+    return
+  }
+
+  const wordCount = chapterForm.value.content.replace(/<[^>]*>/g, '').length
+
+  try {
+    if (editingChapter.value) {
+      await updateChapter(editingChapter.value.id, {
+        title: chapterForm.value.title,
+        summary: chapterForm.value.summary,
+        content: chapterForm.value.content,
+        wordCount,
+        status: ({ draft: 'DRAFT', writing: 'GENERATED', completed: 'PUBLISHED', published: 'PUBLISHED' })[chapterForm.value.status] || 'DRAFT'
+      })
+      ElMessage.success('章节更新成功')
+    } else {
+      await createChapter(selectedNovelId.value, {
+        title: chapterForm.value.title,
+        summary: chapterForm.value.summary,
+        content: chapterForm.value.content,
+        wordCount,
+        sortOrder: chapters.value.length,
+        status: 'DRAFT'
+      })
+      ElMessage.success('章节创建成功')
     }
-  })
+
+    await reloadChapters()
+    showCreateDialog.value = false
+    resetForm()
+  } catch (error) {
+    console.error('保存章节失败:', error)
+    ElMessage.error(error?.response?.data?.message || '保存失败')
+  }
 }
 
-const resetForm = async () => {
+const resetForm = () => {
   chapterForm.value = {
     title: '',
     summary: '',
@@ -525,27 +538,35 @@ const resetForm = async () => {
   tagInput.value = ''
 }
 
-const addChapterTag = async () => {
+const addChapterTag = () => {
   if (tagInput.value.trim() && !chapterForm.value.tags.includes(tagInput.value.trim())) {
     chapterForm.value.tags.push(tagInput.value.trim())
     tagInput.value = ''
   }
 }
 
-const removeChapterTag = async (index) => {
+const removeChapterTag = (index) => {
   chapterForm.value.tags.splice(index, 1)
 }
 
-const sortChapters = async () => {
+const sortChapters = () => {
   ElMessage.info('章节排序功能开发中...')
 }
 
-const batchEdit = async () => {
+const batchEdit = () => {
   if (selectedChapters.value.length === 0) {
     ElMessage.warning('请先选择要编辑的章节')
     return
   }
   ElMessage.info('批量编辑功能开发中...')
+}
+
+const toggleChapterSelect = (chapterId, checked) => {
+  if (checked) {
+    selectedChapters.value.push(chapterId)
+  } else {
+    selectedChapters.value = selectedChapters.value.filter(id => id !== chapterId)
+  }
 }
 
 // 生命周期
