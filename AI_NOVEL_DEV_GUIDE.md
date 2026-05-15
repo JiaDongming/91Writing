@@ -1,8 +1,8 @@
-# 91写作 (AI-Novel-Generator) 改造开发指南
+# 灵溪写作 (AI-Novel-Generator) 改造开发指南
 
 ## 1. 项目说明
 
-91写作是一个基于 Vue 3 + Element Plus 的专业 AI 小说创作平台。
+灵溪写作是一个基于 Vue 3 + Element Plus 的专业 AI 小说创作平台。
 **核心特点：**
 
 - **纯前端架构**：项目没有后端服务，所有的文章、大纲、人物设定等数据均保存在浏览器的本地存储（LocalStorage）中，保障用户隐私与数据安全。

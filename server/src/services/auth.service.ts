@@ -165,6 +165,51 @@ export async function refreshUserToken(refreshToken: string) {
   }
 }
 
+type UpdateProfileInput = {
+  nickname?: string
+  email?: string
+}
+
+export async function updateProfile(userId: string, input: UpdateProfileInput) {
+  const data: Record<string, string> = {}
+  if (input.nickname !== undefined) data.nickname = input.nickname
+
+  if (input.email !== undefined) {
+    const existing = await prisma.user.findUnique({ where: { email: input.email } })
+    if (existing && existing.id !== userId) {
+      throw new Error('该邮箱已被其他账号使用')
+    }
+    data.email = input.email
+  }
+
+  const user = await prisma.user.update({
+    where: { id: userId },
+    data,
+    select: { id: true, email: true, nickname: true, role: true }
+  })
+
+  return user
+}
+
+type ChangePasswordInput = {
+  oldPassword: string
+  newPassword: string
+}
+
+export async function changePassword(userId: string, input: ChangePasswordInput) {
+  const user = await prisma.user.findUnique({ where: { id: userId } })
+  if (!user) throw new Error('用户不存在')
+
+  const valid = await comparePassword(input.oldPassword, user.passwordHash)
+  if (!valid) throw new Error('原密码错误')
+
+  const passwordHash = await hashPassword(input.newPassword)
+  await prisma.user.update({
+    where: { id: userId },
+    data: { passwordHash }
+  })
+}
+
 export async function logoutUser(refreshToken: string) {
   const tokenHash = hashRefreshToken(refreshToken)
 

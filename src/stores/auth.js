@@ -54,6 +54,16 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  async function updateProfile(data) {
+    const { data: updated } = await http.put('/auth/profile', data)
+    user.value = updated
+    return updated
+  }
+
+  async function changePassword(oldPassword, newPassword) {
+    await http.put('/auth/password', { oldPassword, newPassword })
+  }
+
   return {
     user,
     isLoggedIn,
@@ -61,6 +71,8 @@ export const useAuthStore = defineStore('auth', () => {
     login,
     register,
     logout,
+    updateProfile,
+    changePassword,
     setTokens,
     clearTokens
   }

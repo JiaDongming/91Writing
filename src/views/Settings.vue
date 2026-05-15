@@ -1,6 +1,5 @@
 <template>
   <div class="settings-page">
-
     <!-- 设置内容 -->
     <div class="settings-content">
       <el-tabs v-model="activeTab" class="settings-tabs">
@@ -10,15 +9,15 @@
             <template #header>
               <div class="card-header">
                 <span>🔑 AI模型API配置</span>
-                <el-button type="primary" @click="testAllConnections">测试所有连接</el-button>
+                <el-button type="primary" @click="testAllConnections"
+                  >测试所有连接</el-button
+                >
               </div>
             </template>
-            
+
             <ApiConfig />
           </el-card>
         </el-tab-pane>
-
-        
 
         <!-- 数据管理 -->
         <el-tab-pane label="数据管理" name="data">
@@ -26,7 +25,7 @@
             <template #header>
               <span>💾 数据备份与恢复</span>
             </template>
-            
+
             <div class="data-management">
               <!-- 数据概览 -->
               <div class="data-overview">
@@ -83,9 +82,9 @@
                   </el-button>
                 </div>
               </div>
-              
+
               <el-divider />
-              
+
               <div class="data-section">
                 <h3>📥 数据导入</h3>
                 <p>从备份文件恢复您的数据，支持完整恢复或选择性导入</p>
@@ -106,12 +105,14 @@
                   </el-button>
                 </div>
               </div>
-              
+
               <el-divider />
-              
+
               <div class="data-section">
                 <h3>🗑️ 数据清除</h3>
-                <p class="warning-text">⚠️ 危险操作：将清除本地数据，请谨慎操作</p>
+                <p class="warning-text">
+                  ⚠️ 危险操作：将清除本地数据，请谨慎操作
+                </p>
                 <div class="data-actions">
                   <el-button type="danger" @click="clearAllData">
                     <el-icon><Delete /></el-icon>
@@ -137,22 +138,25 @@
             <template #header>
               <span>ℹ️ 关于应用</span>
             </template>
-            
+
             <div class="about-content">
               <div class="app-info">
                 <div class="app-logo">
-                  <h1>📚 91写作</h1>
+                  <h1>📚 灵溪写作</h1>
                 </div>
                 <div class="app-details">
                   <p><strong>版本：</strong>v0.7.0</p>
                   <p><strong>更新时间：</strong>2025年7月9日</p>
-                  <p><strong>开发者：</strong>91写作团队</p>
-                  <p><strong>描述：</strong>基于AI技术的智能小说创作辅助工具，提供全方位的写作支持和创作灵感</p>
+                  <p><strong>开发者：</strong>灵溪写作团队</p>
+                  <p>
+                    <strong>描述：</strong
+                    >基于AI技术的智能小说创作辅助工具，提供全方位的写作支持和创作灵感
+                  </p>
                 </div>
               </div>
-              
+
               <el-divider />
-              
+
               <div class="features-list">
                 <h3>🌟 主要功能</h3>
                 <div class="features-grid">
@@ -165,7 +169,7 @@
                       <li>• 数据统计分析</li>
                     </ul>
                   </div>
-                  
+
                   <div class="feature-category">
                     <h4>✍️ 智能编辑</h4>
                     <ul>
@@ -176,7 +180,7 @@
                       <li>• 流式生成体验</li>
                     </ul>
                   </div>
-                  
+
                   <div class="feature-category">
                     <h4>🤖 AI辅助</h4>
                     <ul>
@@ -187,7 +191,7 @@
                       <li>• 多种生成类型</li>
                     </ul>
                   </div>
-                  
+
                   <div class="feature-category">
                     <h4>💡 创作工具</h4>
                     <ul>
@@ -198,7 +202,7 @@
                       <li>• 写作目标设定</li>
                     </ul>
                   </div>
-                  
+
                   <div class="feature-category">
                     <h4>⚙️ 系统功能</h4>
                     <ul>
@@ -211,12 +215,12 @@
                   </div>
                 </div>
               </div>
-              
+
               <el-divider />
-              
+
               <div class="update-log">
                 <h3>📋 更新日志</h3>
-                
+
                 <div class="log-item current-version">
                   <h4>v0.7.0 (2025-07-9) - 当前版本</h4>
                   <ul>
@@ -228,27 +232,33 @@
                     <li>• 修复若干bug问题</li>
                   </ul>
                 </div>
-                
+
                 <div class="log-item">
                   <h4>v0.6.0 (2025-06-26)</h4>
                   <ul>
-                    <li>• 短篇小说新增续写功能 - 支持自定义续写方向和字数设置</li>
-                    <li>• 短篇小说选文优化功能重构 - 可以优化完成之后一键插入</li>
+                    <li>
+                      • 短篇小说新增续写功能 - 支持自定义续写方向和字数设置
+                    </li>
+                    <li>
+                      • 短篇小说选文优化功能重构 - 可以优化完成之后一键插入
+                    </li>
                     <li>• AI正文编辑器修复部分bug问题 - 提升编辑体验稳定性</li>
                   </ul>
                 </div>
-                
+
                 <div class="log-item">
                   <h4>v0.5.0 (2025-06-24)</h4>
                   <ul>
                     <li>• 模型配置预设模型重新梳理</li>
                     <li>• 短篇小说部分API兼容问题bug修复</li>
-                    <li>• Ai上下文连贯性改为可以手动选择多章，默认自动关联前两章</li>
+                    <li>
+                      • Ai上下文连贯性改为可以手动选择多章，默认自动关联前两章
+                    </li>
                     <li>• 小说无法导出bug修复</li>
                     <li>• 若干功能bug修复</li>
                   </ul>
                 </div>
-                
+
                 <div class="log-item">
                   <h4>v0.4.0 (2025-01-15)</h4>
                   <div class="log-category">
@@ -261,7 +271,7 @@
                       <li>• 流式输出体验，实时查看AI生成过程</li>
                     </ul>
                   </div>
-                  
+
                   <div class="log-category">
                     <h5>🔧 功能优化</h5>
                     <ul>
@@ -272,7 +282,7 @@
                       <li>• 续写字数上限提升至5000字</li>
                     </ul>
                   </div>
-                  
+
                   <div class="log-category">
                     <h5>🛠️ 修复改进</h5>
                     <ul>
@@ -283,7 +293,7 @@
                     </ul>
                   </div>
                 </div>
-                
+
                 <div class="log-item">
                   <h4>v0.3.0 (2024-12-01)</h4>
                   <ul>
@@ -293,7 +303,7 @@
                     <li>• 增强用户界面交互</li>
                   </ul>
                 </div>
-                
+
                 <div class="log-item">
                   <h4>v0.2.0 (2024-02-15)</h4>
                   <ul>
@@ -331,17 +341,30 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { Download, Upload, Document, Setting, Delete, ChatLineSquare, Collection } from '@element-plus/icons-vue'
-import ApiConfig from '@/components/ApiConfig.vue'
-import { listNovels } from '@/services/novelApi'
-import { listPrompts, listGenres, listGoals, updateSettings } from '@/services/workspaceApi'
+import { ref, watch, onMounted } from "vue";
+import { ElMessage, ElMessageBox } from "element-plus";
+import {
+  Download,
+  Upload,
+  Document,
+  Setting,
+  Delete,
+  ChatLineSquare,
+  Collection,
+} from "@element-plus/icons-vue";
+import ApiConfig from "@/components/ApiConfig.vue";
+import { listNovels } from "@/services/novelApi";
+import {
+  listPrompts,
+  listGenres,
+  listGoals,
+  updateSettings,
+} from "@/services/workspaceApi";
 
 // 响应式数据
-const activeTab = ref('api')
-const showImportDialog = ref(false)
-const importOptions = ref(['novels', 'prompts', 'novelGenres', 'writingGoals'])
+const activeTab = ref("api");
+const showImportDialog = ref(false);
+const importOptions = ref(["novels", "prompts", "novelGenres", "writingGoals"]);
 
 // 数据统计
 const dataStats = ref({
@@ -349,14 +372,14 @@ const dataStats = ref({
   prompts: 0,
   genres: 0,
   goals: 0,
-  size: '0KB'
-})
+  size: "0KB",
+});
 
 // 方法
 const testAllConnections = () => {
-  ElMessage.info('正在测试所有API连接...')
+  ElMessage.info("正在测试所有API连接...");
   // 这里调用API配置组件的测试方法
-}
+};
 
 // 计算数据统计
 const calculateDataStats = async () => {
@@ -365,25 +388,25 @@ const calculateDataStats = async () => {
       listNovels().catch(() => []),
       listPrompts().catch(() => []),
       listGenres().catch(() => []),
-      listGoals().catch(() => [])
-    ])
+      listGoals().catch(() => []),
+    ]);
 
-    const allData = JSON.stringify({ novels, prompts, genres, goals })
-    const sizeInBytes = new Blob([allData]).size
-    const sizeInKB = (sizeInBytes / 1024).toFixed(1)
-    const sizeInMB = (sizeInBytes / (1024 * 1024)).toFixed(2)
+    const allData = JSON.stringify({ novels, prompts, genres, goals });
+    const sizeInBytes = new Blob([allData]).size;
+    const sizeInKB = (sizeInBytes / 1024).toFixed(1);
+    const sizeInMB = (sizeInBytes / (1024 * 1024)).toFixed(2);
 
     dataStats.value = {
       novels: novels.length,
       prompts: prompts.length,
       genres: genres.length,
       goals: goals.length,
-      size: sizeInBytes > 1024 * 1024 ? `${sizeInMB}MB` : `${sizeInKB}KB`
-    }
+      size: sizeInBytes > 1024 * 1024 ? `${sizeInMB}MB` : `${sizeInKB}KB`,
+    };
   } catch (error) {
-    console.error('计算数据统计失败:', error)
+    console.error("计算数据统计失败:", error);
   }
-}
+};
 
 const exportAllData = async () => {
   try {
@@ -391,141 +414,166 @@ const exportAllData = async () => {
       listNovels().catch(() => []),
       listPrompts().catch(() => []),
       listGenres().catch(() => []),
-      listGoals().catch(() => [])
-    ])
+      listGoals().catch(() => []),
+    ]);
     const data = {
       novels,
       prompts,
       novelGenres: genres,
       writingGoals: goals,
       exportTime: new Date().toISOString(),
-      version: 'v0.7.0'
-    }
-    downloadJSON(data, `91写作-完整备份-${new Date().toISOString().split('T')[0]}.json`)
-    ElMessage.success('完整数据导出成功')
+      version: "v0.7.0",
+    };
+    downloadJSON(
+      data,
+      `灵溪写作-完整备份-${new Date().toISOString().split("T")[0]}.json`,
+    );
+    ElMessage.success("完整数据导出成功");
   } catch (error) {
-    ElMessage.error('导出失败：' + error.message)
+    ElMessage.error("导出失败：" + error.message);
   }
-}
+};
 
 const exportNovels = async () => {
   try {
-    const novels = await listNovels().catch(() => [])
-    downloadJSON({ novels, exportTime: new Date().toISOString(), type: 'novels' },
-      `91写作-小说数据-${new Date().toISOString().split('T')[0]}.json`)
-    ElMessage.success('小说数据导出成功')
+    const novels = await listNovels().catch(() => []);
+    downloadJSON(
+      { novels, exportTime: new Date().toISOString(), type: "novels" },
+      `灵溪写作-小说数据-${new Date().toISOString().split("T")[0]}.json`,
+    );
+    ElMessage.success("小说数据导出成功");
   } catch (error) {
-    ElMessage.error('导出失败：' + error.message)
+    ElMessage.error("导出失败：" + error.message);
   }
-}
+};
 
 const exportPrompts = async () => {
   try {
-    const prompts = await listPrompts().catch(() => [])
-    downloadJSON({ prompts, exportTime: new Date().toISOString(), type: 'prompts' },
-      `91写作-提示词库-${new Date().toISOString().split('T')[0]}.json`)
-    ElMessage.success('提示词库导出成功')
+    const prompts = await listPrompts().catch(() => []);
+    downloadJSON(
+      { prompts, exportTime: new Date().toISOString(), type: "prompts" },
+      `灵溪写作-提示词库-${new Date().toISOString().split("T")[0]}.json`,
+    );
+    ElMessage.success("提示词库导出成功");
   } catch (error) {
-    ElMessage.error('导出失败：' + error.message)
+    ElMessage.error("导出失败：" + error.message);
   }
-}
+};
 
 const exportGenres = async () => {
   try {
-    const genres = await listGenres().catch(() => [])
-    downloadJSON({ novelGenres: genres, exportTime: new Date().toISOString(), type: 'genres' },
-      `91写作-小说类型-${new Date().toISOString().split('T')[0]}.json`)
-    ElMessage.success('小说类型数据导出成功')
+    const genres = await listGenres().catch(() => []);
+    downloadJSON(
+      {
+        novelGenres: genres,
+        exportTime: new Date().toISOString(),
+        type: "genres",
+      },
+      `灵溪写作-小说类型-${new Date().toISOString().split("T")[0]}.json`,
+    );
+    ElMessage.success("小说类型数据导出成功");
   } catch (error) {
-    ElMessage.error('导出失败：' + error.message)
+    ElMessage.error("导出失败：" + error.message);
   }
-}
+};
 
 const exportSettings = () => {
   const settings = {
-    apiConfig: { type: 'official', model: 'claude-4-sonnet' },
+    apiConfig: { type: "official", model: "claude-4-sonnet" },
     exportTime: new Date().toISOString(),
-    type: 'settings'
-  }
-  downloadJSON(settings, `91写作-系统设置-${new Date().toISOString().split('T')[0]}.json`)
-  ElMessage.success('系统设置导出成功')
-}
+    type: "settings",
+  };
+  downloadJSON(
+    settings,
+    `灵溪写作-系统设置-${new Date().toISOString().split("T")[0]}.json`,
+  );
+  ElMessage.success("系统设置导出成功");
+};
 
 const downloadJSON = (data, filename) => {
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  a.click()
-  URL.revokeObjectURL(url)
-}
+  const blob = new Blob([JSON.stringify(data, null, 2)], {
+    type: "application/json",
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+};
 
 const confirmImportOptions = () => {
   if (importOptions.value.length === 0) {
-    ElMessage.warning('请至少选择一种数据类型进行导入')
-    return
+    ElMessage.warning("请至少选择一种数据类型进行导入");
+    return;
   }
-  
-  const input = document.createElement('input')
-  input.type = 'file'
-  input.accept = '.json'
+
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = ".json";
   input.onchange = (e) => {
-    const file = e.target.files[0]
+    const file = e.target.files[0];
     if (file) {
-      beforeImport(file)
+      beforeImport(file);
     }
-  }
-  input.click()
-  showImportDialog.value = false
-}
+  };
+  input.click();
+  showImportDialog.value = false;
+};
 
 const beforeImport = (file) => {
-  ElMessage.info('数据导入功能已迁移到后端，请通过 API 接口导入数据')
-  return false
-}
+  ElMessage.info("数据导入功能已迁移到后端，请通过 API 接口导入数据");
+  return false;
+};
 
 const clearAllData = () => {
   ElMessageBox.confirm(
-    '清除数据功能已迁移到后端，请通过 API 接口管理数据。是否刷新页面？',
-    '提示',
-    { confirmButtonText: '刷新', cancelButtonText: '取消', type: 'info' }
+    "清除数据功能已迁移到后端，请通过 API 接口管理数据。是否刷新页面？",
+    "提示",
+    { confirmButtonText: "刷新", cancelButtonText: "取消", type: "info" },
   ).then(() => {
-    location.reload()
-  })
-}
+    location.reload();
+  });
+};
 
 const clearNovels = () => {
-  ElMessage.info('数据清除功能已迁移到后端，请在小说管理页面逐一删除')
-}
+  ElMessage.info("数据清除功能已迁移到后端，请在小说管理页面逐一删除");
+};
 
 const clearSettings = () => {
   ElMessageBox.confirm(
-    '确定要重置 API 配置吗？此操作将清除后端保存的配置。',
-    '确认重置设置',
-    { confirmButtonText: '确定重置', cancelButtonText: '取消', type: 'warning' }
+    "确定要重置 API 配置吗？此操作将清除后端保存的配置。",
+    "确认重置设置",
+    {
+      confirmButtonText: "确定重置",
+      cancelButtonText: "取消",
+      type: "warning",
+    },
   ).then(async () => {
     try {
-      await updateSettings({ apiConfigType: 'official', officialApiConfig: {}, customApiConfig: {} })
-      ElMessage.success('API 配置已重置')
-      setTimeout(() => location.reload(), 1000)
+      await updateSettings({
+        apiConfigType: "official",
+        officialApiConfig: {},
+        customApiConfig: {},
+      });
+      ElMessage.success("API 配置已重置");
+      setTimeout(() => location.reload(), 1000);
     } catch (e) {
-      ElMessage.error('重置失败：' + (e.response?.data?.message || e.message))
+      ElMessage.error("重置失败：" + (e.response?.data?.message || e.message));
     }
-  })
-}
+  });
+};
 
 // 生命周期
 onMounted(async () => {
-  await calculateDataStats()
-})
+  await calculateDataStats();
+});
 </script>
 
 <style scoped>
 .settings-page {
   padding: 0;
 }
-
 
 .settings-content {
   background: white;
@@ -750,7 +798,7 @@ onMounted(async () => {
   .data-actions {
     flex-direction: column;
   }
-  
+
   .data-actions .el-button {
     width: 100%;
   }

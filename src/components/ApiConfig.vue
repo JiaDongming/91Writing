@@ -5,15 +5,15 @@
         <div class="card-header">
           <span>API配置</span>
           <el-tag :type="isApiConfigured ? 'success' : 'danger'" size="small">
-            {{ isApiConfigured ? '已配置' : '未配置' }}
+            {{ isApiConfigured ? "已配置" : "未配置" }}
           </el-tag>
         </div>
       </template>
-      
+
       <!-- 配置类型选择 -->
       <div class="config-type-selector">
         <el-radio-group v-model="configType" @change="onConfigTypeChange">
-          <el-radio-button label="official">🏢 91写作官方API</el-radio-button>
+          <el-radio-button label="official">🏢 灵溪写作官方API</el-radio-button>
           <el-radio-button label="custom">⚙️ 自定义API配置</el-radio-button>
         </el-radio-group>
       </div>
@@ -23,43 +23,66 @@
         <!-- 左侧：配置说明 -->
         <div class="config-tips-panel">
           <!-- 官方配置说明 -->
-          <div v-if="configType === 'official'" class="config-tips official-tips">
+          <div
+            v-if="configType === 'official'"
+            class="config-tips official-tips"
+          >
             <h4>🏢 官方默认配置</h4>
             <div class="tips-content">
-              <p><strong>推荐新手使用</strong>，不会自己获取API和配置大模型的用户可以选择91写作官方推出的，API，只需输入密钥即可。采用<strong>按次计费</strong>模式，价格透明。</p>
-              
-                             <div class="model-info">
-                 <h5>推荐模型：</h5>
-                 <ul>
-                   <li><strong>Claude-4 Sonnet</strong> - ￥0.1/次（默认）</li>
-                   <li><strong>Claude Opus 4</strong> - ￥0.5/次（顶级）</li>
-                   <li><strong>Claude-3.7 Thinking</strong> - ￥0.2/次（推理）</li>
-                   <li><strong>Claude-3.7 Sonnet</strong> - ￥0.1/次（经济）</li>
-                 </ul>
-               </div>
-              
-               <div class="usage-steps">
-                 <h5>使用步骤：</h5>
-                 <ol>
-                   <li>输入API密钥</li>
-                   <li>选择模型（推荐Claude-4 Sonnet）</li>
-                   <li>保存配置即可使用</li>
-                   <li><strong>问题交流QQ群：468734087</strong></li>
-                 </ol>
-               </div>
+              <p>
+                <strong>推荐新手使用</strong
+                >，不会自己获取API和配置大模型的用户可以选择灵溪写作官方推出的，API，只需输入密钥即可。采用<strong>按次计费</strong>模式，价格透明。
+              </p>
 
+              <div class="model-info">
+                <h5>推荐模型：</h5>
+                <ul>
+                  <li><strong>Claude-4 Sonnet</strong> - ￥0.1/次（默认）</li>
+                  <li><strong>Claude Opus 4</strong> - ￥0.5/次（顶级）</li>
+                  <li>
+                    <strong>Claude-3.7 Thinking</strong> - ￥0.2/次（推理）
+                  </li>
+                  <li><strong>Claude-3.7 Sonnet</strong> - ￥0.1/次（经济）</li>
+                </ul>
+              </div>
 
-               <div class="usage-steps">
-                 <h5>使用教程：</h5>
-                 <ol>
-                   <li><a href="https://www.bilibili.com/video/BV1keKgzaER2" target="_blank">API配置教程</a></li>
-                   <li><a href="https://www.bilibili.com/video/BV1AYKgzAEne" target="_blank">本地部署及线上部署教程</a></li>
-                  </ol>
-               </div>
-              
+              <div class="usage-steps">
+                <h5>使用步骤：</h5>
+                <ol>
+                  <li>输入API密钥</li>
+                  <li>选择模型（推荐Claude-4 Sonnet）</li>
+                  <li>保存配置即可使用</li>
+                  <li><strong>问题交流QQ群：468734087</strong></li>
+                </ol>
+              </div>
+
+              <div class="usage-steps">
+                <h5>使用教程：</h5>
+                <ol>
+                  <li>
+                    <a
+                      href="https://www.bilibili.com/video/BV1keKgzaER2"
+                      target="_blank"
+                      >API配置教程</a
+                    >
+                  </li>
+                  <li>
+                    <a
+                      href="https://www.bilibili.com/video/BV1AYKgzAEne"
+                      target="_blank"
+                      >本地部署及线上部署教程</a
+                    >
+                  </li>
+                </ol>
+              </div>
+
               <div class="purchase-info">
                 <p>购买API密钥</p>
-                <el-button type="primary" size="small" @click="openPurchaseLink">
+                <el-button
+                  type="primary"
+                  size="small"
+                  @click="openPurchaseLink"
+                >
                   前往购买
                 </el-button>
               </div>
@@ -71,34 +94,51 @@
             <h4>⚙️ 自定义配置</h4>
             <div class="tips-content">
               <p><strong>适合高级用户</strong>，仅支持openai格式API。</p>
-              
+
               <div class="params-info">
                 <h5>参数说明：</h5>
                 <ul>
                   <li><strong>API地址</strong> - 您的API服务地址</li>
                   <li><strong>API密钥</strong> - 身份验证密钥</li>
-                  <li><strong>模型选择</strong> - 如果没有想要的模型，支持自定义模型</li>
+                  <li>
+                    <strong>模型选择</strong> -
+                    如果没有想要的模型，支持自定义模型
+                  </li>
                   <li><strong>Token限制</strong> - 控制生成长度</li>
                   <li><strong>创造性</strong> - 0保守，1创新</li>
                 </ul>
               </div>
-              
+
               <div class="supported-apis">
                 <h5>特殊说明：</h5>
                 <ul>
                   <li>openai格式api是大模型通用格式，支持所有大模型</li>
-                  <li>支持本地部署大模型，如ollama、llmstudio等，自行学习怎么获取openai格式api</li>
+                  <li>
+                    支持本地部署大模型，如ollama、llmstudio等，自行学习怎么获取openai格式api
+                  </li>
                 </ul>
               </div>
 
               <div class="usage-steps">
-                 <h5>使用教程：</h5>
-                 <ol>
-                   <li><a href="https://www.bilibili.com/video/BV1keKgzaER2" target="_blank">API配置教程</a></li>
-                   <li><a href="https://www.bilibili.com/video/BV1AYKgzAEne" target="_blank">本地部署及线上部署教程</a></li>
-                  </ol>
-               </div>
-              
+                <h5>使用教程：</h5>
+                <ol>
+                  <li>
+                    <a
+                      href="https://www.bilibili.com/video/BV1keKgzaER2"
+                      target="_blank"
+                      >API配置教程</a
+                    >
+                  </li>
+                  <li>
+                    <a
+                      href="https://www.bilibili.com/video/BV1AYKgzAEne"
+                      target="_blank"
+                      >本地部署及线上部署教程</a
+                    >
+                  </li>
+                </ol>
+              </div>
+
               <div class="tips-note">
                 <p>💡 建议先测试连接再保存配置</p>
               </div>
@@ -110,18 +150,21 @@
         <div class="config-form-panel">
           <!-- 官方默认配置 -->
           <div v-if="configType === 'official'" class="official-config">
-            <el-alert 
-              title="官方默认配置" 
-              type="info" 
+            <el-alert
+              title="官方默认配置"
+              type="info"
               :closable="false"
               show-icon
             >
-              <template #default>
-                使用官方推荐的API服务，稳定可靠。
-              </template>
+              <template #default> 使用官方推荐的API服务，稳定可靠。 </template>
             </el-alert>
-            
-            <el-form :model="officialForm" label-width="80px" size="small" class="config-form">
+
+            <el-form
+              :model="officialForm"
+              label-width="80px"
+              size="small"
+              class="config-form"
+            >
               <el-form-item label="API密钥">
                 <el-input
                   v-model="officialForm.apiKey"
@@ -131,9 +174,11 @@
                   clearable
                   disabled
                 />
-                <div class="form-tip">API 调用通过后端代理，无需单独配置密钥</div>
+                <div class="form-tip">
+                  API 调用通过后端代理，无需单独配置密钥
+                </div>
               </el-form-item>
-              
+
               <el-form-item label="API地址">
                 <el-input
                   v-model="officialForm.baseURL"
@@ -142,9 +187,12 @@
                 />
                 <div class="form-tip">官方优化地址，无需修改</div>
               </el-form-item>
-              
+
               <el-form-item label="推荐模型">
-                <el-select v-model="officialForm.selectedModel" placeholder="选择推荐模型">
+                <el-select
+                  v-model="officialForm.selectedModel"
+                  placeholder="选择推荐模型"
+                >
                   <el-option
                     v-for="model in officialModels"
                     :key="model.id"
@@ -159,10 +207,13 @@
                   </el-option>
                 </el-select>
               </el-form-item>
-              
+
               <el-form-item label="最大Token">
                 <div class="max-tokens-control">
-                  <el-checkbox v-model="officialForm.unlimitedTokens" @change="handleOfficialUnlimitedTokensChange">
+                  <el-checkbox
+                    v-model="officialForm.unlimitedTokens"
+                    @change="handleOfficialUnlimitedTokensChange"
+                  >
                     无限制Token
                   </el-checkbox>
                   <el-input-number
@@ -175,7 +226,7 @@
                   />
                 </div>
               </el-form-item>
-              
+
               <el-form-item label="创造性">
                 <el-slider
                   v-model="officialForm.temperature"
@@ -186,12 +237,19 @@
                   show-tooltip
                 />
               </el-form-item>
-              
+
               <el-form-item>
-                <el-button type="primary" @click="saveOfficialConfig" :loading="validating">
-                  {{ validating ? '验证中...' : '保存配置' }}
+                <el-button
+                  type="primary"
+                  @click="saveOfficialConfig"
+                  :loading="validating"
+                >
+                  {{ validating ? "验证中..." : "保存配置" }}
                 </el-button>
-                <el-button @click="testOfficialConnection" :loading="validating">
+                <el-button
+                  @click="testOfficialConnection"
+                  :loading="validating"
+                >
                   测试连接
                 </el-button>
               </el-form-item>
@@ -200,9 +258,9 @@
 
           <!-- 自定义配置 -->
           <div v-else class="custom-config">
-            <el-alert 
-              title="自定义配置" 
-              type="warning" 
+            <el-alert
+              title="自定义配置"
+              type="warning"
               :closable="false"
               show-icon
             >
@@ -210,8 +268,13 @@
                 高级用户可自定义API地址和模型参数。
               </template>
             </el-alert>
-            
-            <el-form :model="customForm" label-width="80px" size="small" class="config-form">
+
+            <el-form
+              :model="customForm"
+              label-width="80px"
+              size="small"
+              class="config-form"
+            >
               <el-form-item label="API密钥" required>
                 <el-input
                   v-model="customForm.apiKey"
@@ -221,7 +284,7 @@
                   clearable
                 />
               </el-form-item>
-              
+
               <el-form-item label="API地址" required>
                 <el-input
                   v-model="customForm.baseURL"
@@ -229,10 +292,10 @@
                   clearable
                 />
               </el-form-item>
-              
+
               <el-form-item label="模型选择">
-                <el-select 
-                  v-model="customForm.selectedModel" 
+                <el-select
+                  v-model="customForm.selectedModel"
                   placeholder="选择模型"
                   filterable
                   allow-create
@@ -250,7 +313,7 @@
                   </el-option>
                 </el-select>
               </el-form-item>
-              
+
               <el-form-item label="自定义模型">
                 <div class="custom-model-input">
                   <el-input
@@ -258,7 +321,9 @@
                     placeholder="输入自定义模型名称"
                     @keyup.enter="addCustomModel"
                   />
-                  <el-button @click="addCustomModel" type="primary" size="small">添加</el-button>
+                  <el-button @click="addCustomModel" type="primary" size="small"
+                    >添加</el-button
+                  >
                 </div>
                 <div v-if="customModels.length > 0" class="custom-models-list">
                   <el-tag
@@ -267,16 +332,19 @@
                     closable
                     @close="removeCustomModel(model.id)"
                     size="small"
-                    style="margin-right: 8px; margin-bottom: 4px;"
+                    style="margin-right: 8px; margin-bottom: 4px"
                   >
                     {{ model.name }}
                   </el-tag>
                 </div>
               </el-form-item>
-              
+
               <el-form-item label="最大Token">
                 <div class="max-tokens-control">
-                  <el-checkbox v-model="customForm.unlimitedTokens" @change="handleCustomUnlimitedTokensChange">
+                  <el-checkbox
+                    v-model="customForm.unlimitedTokens"
+                    @change="handleCustomUnlimitedTokensChange"
+                  >
                     无限制Token
                   </el-checkbox>
                   <el-input-number
@@ -289,7 +357,7 @@
                   />
                 </div>
               </el-form-item>
-              
+
               <el-form-item label="创造性">
                 <el-slider
                   v-model="customForm.temperature"
@@ -300,10 +368,14 @@
                   show-tooltip
                 />
               </el-form-item>
-              
+
               <el-form-item>
-                <el-button type="primary" @click="saveCustomConfig" :loading="validating">
-                  {{ validating ? '验证中...' : '保存配置' }}
+                <el-button
+                  type="primary"
+                  @click="saveCustomConfig"
+                  :loading="validating"
+                >
+                  {{ validating ? "验证中..." : "保存配置" }}
                 </el-button>
                 <el-button @click="testCustomConnection" :loading="validating">
                   测试连接
@@ -319,361 +391,383 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
-import { useNovelStore } from '../stores/novel.js'
-import apiService from '../services/api.js'
-import { listProviders, createProvider, updateProvider, getSettings, updateSettings } from '@/services/workspaceApi'
+import { ref, reactive, computed, onMounted } from "vue";
+import { ElMessage } from "element-plus";
+import { useNovelStore } from "../stores/novel.js";
+import apiService from "../services/api.js";
+import {
+  listProviders,
+  createProvider,
+  updateProvider,
+  getSettings,
+  updateSettings,
+} from "@/services/workspaceApi";
 
-const store = useNovelStore()
-const validating = ref(false)
-const customModelInput = ref('')
-const customModels = ref([])
-const configType = ref('official') // 'official' 或 'custom'
+const store = useNovelStore();
+const validating = ref(false);
+const customModelInput = ref("");
+const customModels = ref([]);
+const configType = ref("official"); // 'official' 或 'custom'
 
 // 官方默认配置
 const officialForm = reactive({
-  apiKey: '',
-  baseURL: 'https://ai.91hub.vip/v1',
-  selectedModel: 'claude-4-sonnet',
+  apiKey: "",
+  baseURL: "https://ai.91hub.vip/v1",
+  selectedModel: "claude-4-sonnet",
   maxTokens: 4096,
   unlimitedTokens: false,
-  temperature: 0.7
-})
+  temperature: 0.7,
+});
 
 // 自定义配置
 const customForm = reactive({
-  apiKey: '',
-  baseURL: 'https://api.openai.com/v1',
-  selectedModel: 'gpt-3.5-turbo',
+  apiKey: "",
+  baseURL: "https://api.openai.com/v1",
+  selectedModel: "gpt-3.5-turbo",
   maxTokens: 4096,
   unlimitedTokens: false,
-  temperature: 0.7
-})
+  temperature: 0.7,
+});
 
 // 官方推荐模型（带价格）
 const officialModels = [
   {
-    id: 'claude-4-sonnet',
-    name: 'Claude-4 Sonnet',
-    description: '最新一代Claude模型，擅长创意写作和长文本处理',
-    price: '￥0.1/次'
+    id: "claude-4-sonnet",
+    name: "Claude-4 Sonnet",
+    description: "最新一代Claude模型，擅长创意写作和长文本处理",
+    price: "￥0.1/次",
   },
   {
-    id: 'claude-opus-4-20250514',
-    name: 'Claude Opus 4',
-    description: '最强性能Claude模型，顶级创作能力',
-    price: '￥0.5/次'
+    id: "claude-opus-4-20250514",
+    name: "Claude Opus 4",
+    description: "最强性能Claude模型，顶级创作能力",
+    price: "￥0.5/次",
   },
   {
-    id: 'claude-3-7-sonnet-thinking',
-    name: 'Claude-3.7 Sonnet Thinking',
-    description: '具备思维链的Claude模型，逻辑推理强',
-    price: '￥0.2/次'
+    id: "claude-3-7-sonnet-thinking",
+    name: "Claude-3.7 Sonnet Thinking",
+    description: "具备思维链的Claude模型，逻辑推理强",
+    price: "￥0.2/次",
   },
   {
-    id: 'claude-3-7-sonnet-20250219',
-    name: 'Claude-3.7 Sonnet',
-    description: '高性能版本，平衡性能与成本',
-    price: '￥0.1/次'
-  }
-]
+    id: "claude-3-7-sonnet-20250219",
+    name: "Claude-3.7 Sonnet",
+    description: "高性能版本，平衡性能与成本",
+    price: "￥0.1/次",
+  },
+];
 
 // 自定义配置可选模型
 const defaultModels = [
   {
-    id: 'deepseek-reasoner',
-    name: 'deepseek-r1',
-    description: 'deepseek-r1'
+    id: "deepseek-reasoner",
+    name: "deepseek-r1",
+    description: "deepseek-r1",
   },
   {
-    id: 'deepseek-chat',
-    name: 'deepseek-v3',
-    description: 'deepseek-v3'
+    id: "deepseek-chat",
+    name: "deepseek-v3",
+    description: "deepseek-v3",
   },
   {
-    id: 'claude-3.7-sonnet',
-    name: 'claude-3.7-sonnet',
-    description: 'claude-3.7-sonnet'
+    id: "claude-3.7-sonnet",
+    name: "claude-3.7-sonnet",
+    description: "claude-3.7-sonnet",
   },
   {
-    id: 'claude-4-sonnet',
-    name: 'claude-4-sonnet',
-    description: 'claude-4-sonnet'
+    id: "claude-4-sonnet",
+    name: "claude-4-sonnet",
+    description: "claude-4-sonnet",
   },
   {
-    id: 'gemini-2.5-pro-preview-05-06',
-    name: 'gemini-2.5-pro-preview-05-06',
-    description: 'gemini-2.5-pro-preview-05-06'
-  }
-]
+    id: "gemini-2.5-pro-preview-05-06",
+    name: "gemini-2.5-pro-preview-05-06",
+    description: "gemini-2.5-pro-preview-05-06",
+  },
+];
 
 const availableModels = computed(() => {
-  return [...defaultModels, ...customModels.value]
-})
+  return [...defaultModels, ...customModels.value];
+});
 
-const isApiConfigured = computed(() => store.isApiConfigured)
+const isApiConfigured = computed(() => store.isApiConfigured);
 
 const formatTemperature = (value) => {
-  if (value <= 0.3) return '保守'
-  if (value <= 0.7) return '平衡'
-  return '创新'
-}
+  if (value <= 0.3) return "保守";
+  if (value <= 0.7) return "平衡";
+  return "创新";
+};
 
 // 打开购买链接
 const openPurchaseLink = () => {
-  window.open('https://item.taobao.com/item.htm?ft=t&id=938261705242', '_blank')
-}
+  window.open(
+    "https://item.taobao.com/item.htm?ft=t&id=938261705242",
+    "_blank",
+  );
+};
 
 // 配置类型切换
 const onConfigTypeChange = (type) => {
-  configType.value = type
+  configType.value = type;
   // 根据配置类型更新store中的配置
-  const currentForm = type === 'official' ? officialForm : customForm
-  store.updateApiConfig(currentForm, type)
-  store.switchConfigType(type)
-}
+  const currentForm = type === "official" ? officialForm : customForm;
+  store.updateApiConfig(currentForm, type);
+  store.switchConfigType(type);
+};
 
 // 官方配置相关方法
 const handleOfficialUnlimitedTokensChange = () => {
   if (officialForm.unlimitedTokens) {
-    officialForm.maxTokens = null
+    officialForm.maxTokens = null;
   } else {
-    officialForm.maxTokens = 4096
+    officialForm.maxTokens = 4096;
   }
-}
+};
 
 const saveOfficialConfig = async () => {
-  validating.value = true
+  validating.value = true;
   try {
-    const providers = await listProviders()
-    const existing = providers.find(p => p.provider === 'OPENAI' && p.name === '91写作官方')
+    const providers = await listProviders();
+    const existing = providers.find(
+      (p) => p.provider === "OPENAI" && p.name === "灵溪写作官方",
+    );
     const providerData = {
-      provider: 'OPENAI',
-      name: '91写作官方',
+      provider: "OPENAI",
+      name: "灵溪写作官方",
       baseUrl: officialForm.baseURL || null,
       apiKey: officialForm.apiKey || null,
       model: officialForm.selectedModel,
       isDefault: true,
-      isEnabled: true
-    }
+      isEnabled: true,
+    };
     if (existing) {
-      await updateProvider(existing.id, providerData)
+      await updateProvider(existing.id, providerData);
     } else {
-      await createProvider(providerData)
+      await createProvider(providerData);
     }
 
-    const settings = await getSettings()
-    const data = settings?.data || {}
+    const settings = await getSettings();
+    const data = settings?.data || {};
     data.officialApiConfig = {
       selectedModel: officialForm.selectedModel,
       maxTokens: officialForm.maxTokens,
       unlimitedTokens: officialForm.unlimitedTokens,
-      temperature: officialForm.temperature
-    }
-    data.apiConfigType = 'official'
-    await updateSettings(data)
+      temperature: officialForm.temperature,
+    };
+    data.apiConfigType = "official";
+    await updateSettings(data);
 
-    store.updateApiConfig(officialForm, 'official')
-    store.switchConfigType('official')
-    ElMessage.success('配置保存成功')
+    store.updateApiConfig(officialForm, "official");
+    store.switchConfigType("official");
+    ElMessage.success("配置保存成功");
   } catch (error) {
-    ElMessage.error('配置保存失败：' + (error.response?.data?.message || error.message))
+    ElMessage.error(
+      "配置保存失败：" + (error.response?.data?.message || error.message),
+    );
   } finally {
-    validating.value = false
+    validating.value = false;
   }
-}
+};
 
 const testOfficialConnection = async () => {
-  validating.value = true
+  validating.value = true;
   try {
-    store.updateApiConfig(officialForm, 'official')
-    store.switchConfigType('official')
-    ElMessage.success('配置已就绪，AI 调用将通过后端代理')
+    store.updateApiConfig(officialForm, "official");
+    store.switchConfigType("official");
+    ElMessage.success("配置已就绪，AI 调用将通过后端代理");
   } catch (error) {
-    ElMessage.error('连接测试失败：' + error.message)
+    ElMessage.error("连接测试失败：" + error.message);
   } finally {
-    validating.value = false
+    validating.value = false;
   }
-}
+};
 
 // 自定义配置相关方法
 const handleCustomUnlimitedTokensChange = () => {
   if (customForm.unlimitedTokens) {
-    customForm.maxTokens = null
+    customForm.maxTokens = null;
   } else {
-    customForm.maxTokens = 4096
+    customForm.maxTokens = 4096;
   }
-}
+};
 
 const addCustomModel = () => {
-  const modelName = customModelInput.value.trim()
-  if (!modelName) return
-  
-  const exists = availableModels.value.some(model => model.id === modelName)
+  const modelName = customModelInput.value.trim();
+  if (!modelName) return;
+
+  const exists = availableModels.value.some((model) => model.id === modelName);
   if (exists) {
-    ElMessage.warning('该模型已存在')
-    return
+    ElMessage.warning("该模型已存在");
+    return;
   }
-  
+
   customModels.value.push({
     id: modelName,
     name: modelName,
-    description: '自定义模型'
-  })
-  
-  customModelInput.value = ''
-  ElMessage.success('自定义模型添加成功')
-  saveCustomModels()
-}
+    description: "自定义模型",
+  });
+
+  customModelInput.value = "";
+  ElMessage.success("自定义模型添加成功");
+  saveCustomModels();
+};
 
 const removeCustomModel = (modelId) => {
-  const index = customModels.value.findIndex(model => model.id === modelId)
+  const index = customModels.value.findIndex((model) => model.id === modelId);
   if (index > -1) {
-    customModels.value.splice(index, 1)
-    
+    customModels.value.splice(index, 1);
+
     if (customForm.selectedModel === modelId) {
-      customForm.selectedModel = 'gpt-3.5-turbo'
+      customForm.selectedModel = "gpt-3.5-turbo";
     }
-    
-    ElMessage.success('自定义模型删除成功')
-    saveCustomModels()
+
+    ElMessage.success("自定义模型删除成功");
+    saveCustomModels();
   }
-}
+};
 
 const saveCustomModels = async () => {
   try {
-    const settings = await getSettings()
-    const data = settings?.data || {}
-    data.customModels = customModels.value
-    await updateSettings(data)
+    const settings = await getSettings();
+    const data = settings?.data || {};
+    data.customModels = customModels.value;
+    await updateSettings(data);
   } catch (error) {
-    console.error('保存自定义模型失败:', error)
+    console.error("保存自定义模型失败:", error);
   }
-}
+};
 
 const loadCustomModels = async () => {
   try {
-    const settings = await getSettings()
-    const data = settings?.data || {}
+    const settings = await getSettings();
+    const data = settings?.data || {};
     if (data.customModels && Array.isArray(data.customModels)) {
-      customModels.value = data.customModels
+      customModels.value = data.customModels;
     }
   } catch (error) {
-    console.error('加载自定义模型失败:', error)
+    console.error("加载自定义模型失败:", error);
   }
-}
+};
 
 const saveCustomConfig = async () => {
-  validating.value = true
+  validating.value = true;
   try {
-    const providers = await listProviders()
-    const existing = providers.find(p => p.provider === 'CUSTOM' && p.name === '自定义配置')
+    const providers = await listProviders();
+    const existing = providers.find(
+      (p) => p.provider === "CUSTOM" && p.name === "自定义配置",
+    );
     const providerData = {
-      provider: 'CUSTOM',
-      name: '自定义配置',
+      provider: "CUSTOM",
+      name: "自定义配置",
       baseUrl: customForm.baseURL || null,
       apiKey: customForm.apiKey || null,
       model: customForm.selectedModel,
-      isDefault: configType.value === 'custom',
-      isEnabled: true
-    }
+      isDefault: configType.value === "custom",
+      isEnabled: true,
+    };
     if (existing) {
-      await updateProvider(existing.id, providerData)
+      await updateProvider(existing.id, providerData);
     } else {
-      await createProvider(providerData)
+      await createProvider(providerData);
     }
 
-    const settings = await getSettings()
-    const data = settings?.data || {}
+    const settings = await getSettings();
+    const data = settings?.data || {};
     data.customApiConfig = {
       selectedModel: customForm.selectedModel,
       maxTokens: customForm.maxTokens,
       unlimitedTokens: customForm.unlimitedTokens,
       temperature: customForm.temperature,
       baseURL: customForm.baseURL,
-      apiKey: customForm.apiKey
-    }
-    data.customModels = customModels.value
-    data.apiConfigType = 'custom'
-    await updateSettings(data)
+      apiKey: customForm.apiKey,
+    };
+    data.customModels = customModels.value;
+    data.apiConfigType = "custom";
+    await updateSettings(data);
 
-    store.updateApiConfig(customForm, 'custom')
-    store.switchConfigType('custom')
-    ElMessage.success('自定义配置保存成功')
+    store.updateApiConfig(customForm, "custom");
+    store.switchConfigType("custom");
+    ElMessage.success("自定义配置保存成功");
   } catch (error) {
-    ElMessage.error('配置保存失败：' + (error.response?.data?.message || error.message))
+    ElMessage.error(
+      "配置保存失败：" + (error.response?.data?.message || error.message),
+    );
   } finally {
-    validating.value = false
+    validating.value = false;
   }
-}
+};
 
 const testCustomConnection = async () => {
-  validating.value = true
+  validating.value = true;
   try {
-    store.updateApiConfig(customForm, 'custom')
-    store.switchConfigType('custom')
-    ElMessage.success('配置已就绪，AI 调用将通过后端代理')
+    store.updateApiConfig(customForm, "custom");
+    store.switchConfigType("custom");
+    ElMessage.success("配置已就绪，AI 调用将通过后端代理");
   } catch (error) {
-    ElMessage.error('连接测试失败：' + error.message)
+    ElMessage.error("连接测试失败：" + error.message);
   } finally {
-    validating.value = false
+    validating.value = false;
   }
-}
+};
 
 const resetCustomConfig = () => {
   Object.assign(customForm, {
-    apiKey: '',
-    baseURL: 'https://api.openai.com/v1',
-    selectedModel: 'gpt-3.5-turbo',
+    apiKey: "",
+    baseURL: "https://api.openai.com/v1",
+    selectedModel: "gpt-3.5-turbo",
     maxTokens: 4096,
     unlimitedTokens: false,
-    temperature: 0.7
-  })
-  ElMessage.success('自定义配置已重置')
-}
+    temperature: 0.7,
+  });
+  ElMessage.success("自定义配置已重置");
+};
 
 // 加载保存的配置（从后端）
 const loadSavedConfig = async () => {
   try {
-    const settings = await getSettings()
-    const data = settings?.data || {}
+    const settings = await getSettings();
+    const data = settings?.data || {};
 
-    configType.value = data.apiConfigType || 'official'
+    configType.value = data.apiConfigType || "official";
 
-    const officialSettings = data.officialApiConfig
+    const officialSettings = data.officialApiConfig;
     if (officialSettings) {
-      if (officialSettings.selectedModel) officialForm.selectedModel = officialSettings.selectedModel
-      if (officialSettings.maxTokens !== undefined) officialForm.maxTokens = officialSettings.maxTokens
-      if (officialSettings.unlimitedTokens !== undefined) officialForm.unlimitedTokens = officialSettings.unlimitedTokens
-      if (officialSettings.temperature !== undefined) officialForm.temperature = officialSettings.temperature
+      if (officialSettings.selectedModel)
+        officialForm.selectedModel = officialSettings.selectedModel;
+      if (officialSettings.maxTokens !== undefined)
+        officialForm.maxTokens = officialSettings.maxTokens;
+      if (officialSettings.unlimitedTokens !== undefined)
+        officialForm.unlimitedTokens = officialSettings.unlimitedTokens;
+      if (officialSettings.temperature !== undefined)
+        officialForm.temperature = officialSettings.temperature;
     }
-    officialForm.baseURL = 'https://ai.91hub.vip/v1'
+    officialForm.baseURL = "https://ai.91hub.vip/v1";
 
-    const customSettings = data.customApiConfig
+    const customSettings = data.customApiConfig;
     if (customSettings) {
-      Object.assign(customForm, customSettings)
+      Object.assign(customForm, customSettings);
       if (customSettings.unlimitedTokens === undefined) {
-        customForm.unlimitedTokens = customSettings.maxTokens === null
+        customForm.unlimitedTokens = customSettings.maxTokens === null;
       }
     }
 
     if (data.customModels && Array.isArray(data.customModels)) {
-      customModels.value = data.customModels
+      customModels.value = data.customModels;
     }
   } catch (error) {
-    console.error('从后端加载配置失败:', error)
+    console.error("从后端加载配置失败:", error);
   }
 
   // 应用当前配置到 store
-  const currentForm = configType.value === 'official' ? officialForm : customForm
-  store.updateApiConfig(currentForm, configType.value)
-  store.switchConfigType(configType.value)
-}
+  const currentForm =
+    configType.value === "official" ? officialForm : customForm;
+  store.updateApiConfig(currentForm, configType.value);
+  store.switchConfigType(configType.value);
+};
 
 onMounted(async () => {
-  await loadSavedConfig()
-})
+  await loadSavedConfig();
+});
 </script>
 
 <style scoped>
@@ -811,7 +905,7 @@ onMounted(async () => {
 }
 
 .model-price {
-  color: #F56C6C;
+  color: #f56c6c;
   font-size: 12px;
   font-weight: 600;
 }
@@ -850,12 +944,12 @@ onMounted(async () => {
     grid-template-columns: 1fr;
     gap: 16px;
   }
-  
+
   .config-tips-panel,
   .config-form-panel {
     min-height: auto;
   }
-  
+
   .config-card {
     max-width: 100%;
   }
@@ -885,7 +979,8 @@ onMounted(async () => {
   margin-bottom: 16px;
 }
 
-.official-config, .custom-config {
+.official-config,
+.custom-config {
   min-height: 350px;
 }
 </style>

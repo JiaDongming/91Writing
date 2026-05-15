@@ -1,10 +1,10 @@
 // 公告配置文件
 export const announcements = [
   {
-    id: 'v0.7.0',
-    version: '0.7.0',
-    title: '🎉 AI小说生成v0.7.0 重大更新',
-    date: '2025-01-20',
+    id: "v0.7.0",
+    version: "0.7.0",
+    title: "🎉 AI小说生成v0.7.0 重大更新",
+    date: "2025-01-20",
     priority: 1, // 优先级，数字越大越重要
     content: `
 # 🎉 欢迎使用AI小说生成工具 v0.7.0
@@ -16,7 +16,7 @@ export const announcements = [
 - [本地部署教程](https://www.bilibili.com/video/BV1AYKgzAEne)
 
 ### 💡 快速开始
-1. 选择 **91写作官方API** (推荐新手)
+1. 选择 **灵溪写作官方API** (推荐新手)
 2. 购买API密钥并输入
 3. 选择合适的AI模型
 
@@ -39,7 +39,7 @@ export const announcements = [
 ## ✨ v0.7.0 更新内容
 
 ### 🔧 API配置优化
-- **优化API配置新增官方默认API**: 新增91写作官方API服务，按次计费，价格透明
+- **优化API配置新增官方默认API**: 新增灵溪写作官方API服务，按次计费，价格透明
 - **自定义API配置**: 支持所有OpenAI格式的API接口
 - **智能配置向导**: 分为新手和高级用户模式，操作更简单
 
@@ -72,13 +72,13 @@ export const announcements = [
 ---
 
 **感谢您使用AI小说生成工具！祝您创作愉快！** ✍️
-    `
+    `,
   },
   {
-    id: 'v0.6.0',
-    version: '0.6.0', 
-    title: '🔧 系统优化更新',
-    date: '2024-01-15',
+    id: "v0.6.0",
+    version: "0.6.0",
+    title: "🔧 系统优化更新",
+    date: "2024-01-15",
     priority: 0,
     content: `
 # 📋 系统优化更新 v0.6.0
@@ -101,46 +101,46 @@ export const announcements = [
 - 优化备份管理
 
 感谢您的使用和反馈！
-    `
-  }
-]
+    `,
+  },
+];
 
 // 获取最新公告
 export function getLatestAnnouncement() {
-  return announcements
-    .sort((a, b) => b.priority - a.priority)
-    .find(announcement => announcement.priority > 0) || announcements[0]
+  return (
+    announcements
+      .sort((a, b) => b.priority - a.priority)
+      .find((announcement) => announcement.priority > 0) || announcements[0]
+  );
 }
 
 // 获取指定版本的公告
 export function getAnnouncementByVersion(version) {
-  return announcements.find(announcement => announcement.version === version)
+  return announcements.find((announcement) => announcement.version === version);
 }
 
 // 检查是否有新版本公告
 export function hasNewAnnouncement() {
-  const lastReadVersion = localStorage.getItem('lastReadAnnouncementVersion')
-  const latestAnnouncement = getLatestAnnouncement()
-  
+  const lastReadVersion = localStorage.getItem("lastReadAnnouncementVersion");
+  const latestAnnouncement = getLatestAnnouncement();
+
   if (!lastReadVersion) {
-    return true
+    return true;
   }
-  
-  return lastReadVersion !== latestAnnouncement.version
+
+  return lastReadVersion !== latestAnnouncement.version;
 }
 
 // 标记公告为已读
 export function markAnnouncementAsRead(version) {
-  localStorage.setItem('lastReadAnnouncementVersion', version)
-  localStorage.setItem('lastReadAnnouncementDate', new Date().toISOString())
+  localStorage.setItem("lastReadAnnouncementVersion", version);
+  localStorage.setItem("lastReadAnnouncementDate", new Date().toISOString());
 }
-
-
 
 // 获取用户统计信息
 export function getAnnouncementStats() {
   return {
-    lastReadVersion: localStorage.getItem('lastReadAnnouncementVersion'),
-    lastReadDate: localStorage.getItem('lastReadAnnouncementDate')
-  }
+    lastReadVersion: localStorage.getItem("lastReadAnnouncementVersion"),
+    lastReadDate: localStorage.getItem("lastReadAnnouncementDate"),
+  };
 }
