@@ -495,6 +495,76 @@ const handleAnnouncementClose = () => {
   showAnnouncement.value = false;
 };
 
+// 用户信息相关
+const initProfileForm = () => {
+  profileForm.value.nickname = authStore.user?.nickname || '';
+  profileForm.value.email = authStore.user?.email || '';
+};
+
+const saveProfile = async () => {
+  try {
+    await profileFormRef.value.validate();
+  } catch {
+    return;
+  }
+
+  savingProfile.value = true;
+  try {
+    await authStore.updateProfile({
+      nickname: profileForm.value.nickname,
+      email: profileForm.value.email
+    });
+    ElMessage.success('资料已更新');
+  } catch (error) {
+    ElMessage.error(error?.response?.data?.message || '更新失败');
+  } finally {
+    savingProfile.value = false;
+  }
+};
+
+const resetProfile = () => {
+  initProfileForm();
+  profileFormRef.value?.clearValidate();
+};
+
+const savePassword = async () => {
+  try {
+    await passwordFormRef.value.validate();
+  } catch {
+    return;
+  }
+
+  savingPassword.value = true;
+  try {
+    await authStore.changePassword(
+      passwordForm.value.oldPassword,
+      passwordForm.value.newPassword
+    );
+    ElMessage.success('密码已修改，请重新登录');
+    passwordForm.value = { oldPassword: '', newPassword: '', confirmPassword: '' };
+    passwordFormRef.value?.resetFields();
+    setTimeout(() => {
+      authStore.logout();
+      router.push('/login');
+    }, 1500);
+  } catch (error) {
+    ElMessage.error(error?.response?.data?.message || '密码修改失败');
+  } finally {
+    savingPassword.value = false;
+  }
+};
+
+// 打开用户信息框时自动填入当前用户数据
+watch(showUserProfile, (val) => {
+  if (val) {
+    profileTab.value = 'info';
+    initProfileForm();
+    profileFormRef.value?.clearValidate();
+    passwordForm.value = { oldPassword: '', newPassword: '', confirmPassword: '' };
+    passwordFormRef.value?.resetFields();
+  }
+});
+
 const handleModelChange = async (modelId) => {
   try {
     const isOfficialModel = officialModels.value.find((m) => m.id === modelId);
