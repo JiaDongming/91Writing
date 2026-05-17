@@ -63,19 +63,44 @@
           <div class="card-header">
             <span>📚 {{ selectedNovel.title }} - 章节列表</span>
             <div class="header-actions">
-              <el-button size="small" @click="sortChapters">排序</el-button>
+              <el-button size="small" @click="toggleSortMode" :type="sortMode ? 'primary' : 'default'">
+                {{ sortMode ? '完成排序' : '排序' }}
+              </el-button>
               <el-button size="small" @click="batchEdit">批量编辑</el-button>
             </div>
           </div>
         </template>
         
+        <div v-if="sortMode" class="sort-tip">
+          <el-alert
+            title="拖拽章节卡片可以调整章节顺序，完成后点击「完成排序」保存"
+            type="info"
+            :closable="false"
+            show-icon
+          />
+        </div>
+
         <div class="chapters-list">
-          <div 
-            v-for="(chapter, index) in chapters" 
+          <div
+            v-for="(chapter, index) in chapters"
             :key="chapter.id"
             class="chapter-item"
-            :class="{ 'selected': selectedChapters.includes(chapter.id) }"
+            :class="{
+              'selected': selectedChapters.includes(chapter.id),
+              'sortable': sortMode
+            }"
+            :draggable="sortMode"
+            @dragstart="onDragStart($event, index)"
+            @dragend="onDragEnd"
+            @dragover="onDragOver"
+            @dragenter="onDragEnter"
+            @dragleave="onDragLeave"
+            @drop="onDrop($event, index)"
           >
+            <div v-if="sortMode" class="drag-handle">
+              <el-icon><Rank /></el-icon>
+            </div>
+
             <div class="chapter-checkbox">
               <el-checkbox
                 :model-value="selectedChapters.includes(chapter.id)"
@@ -273,9 +298,9 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { 
-  Plus, EditPen, Calendar, Edit, View, MoreFilled, 
-  CopyDocument, ArrowUp, ArrowDown, Delete 
+import {
+  Plus, EditPen, Calendar, Edit, View, MoreFilled,
+  CopyDocument, ArrowUp, ArrowDown, Delete, Rank
 } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 import { listNovels, getNovel, createChapter, updateChapter, deleteChapter as apiDeleteChapter } from '@/services/novelApi'
@@ -297,6 +322,8 @@ const novels = ref([])
 
 // 章节数据
 const chapters = ref([])
+const sortMode = ref(false)
+const draggedIndex = ref(null)
 
 // 表单数据
 const chapterForm = ref({
@@ -549,8 +576,72 @@ const removeChapterTag = (index) => {
   chapterForm.value.tags.splice(index, 1)
 }
 
-const sortChapters = () => {
-  ElMessage.info('章节排序功能开发中...')
+const toggleSortMode = () => {
+  sortMode.value = !sortMode.value
+  if (!sortMode.value) {
+    draggedIndex.value = null
+  }
+}
+
+const onDragStart = (e, index) => {
+  if (!sortMode.value) return
+  draggedIndex.value = index
+  e.dataTransfer.effectAllowed = 'move'
+  e.dataTransfer.setData('text/plain', index.toString())
+  e.target.classList.add('dragging')
+}
+
+const onDragEnd = (e) => {
+  e.target.classList.remove('dragging')
+}
+
+const onDragOver = (e) => {
+  if (!sortMode.value) return
+  e.preventDefault()
+  e.dataTransfer.dropEffect = 'move'
+}
+
+const onDragEnter = (e) => {
+  if (!sortMode.value) return
+  e.preventDefault()
+  e.target.closest('.chapter-item')?.classList.add('drag-over')
+}
+
+const onDragLeave = (e) => {
+  e.target.closest('.chapter-item')?.classList.remove('drag-over')
+}
+
+const onDrop = async (e, dropIndex) => {
+  e.preventDefault()
+  e.target.closest('.chapter-item')?.classList.remove('drag-over')
+
+  const dragIndex = draggedIndex.value
+  if (dragIndex === null || dragIndex === dropIndex) {
+    draggedIndex.value = null
+    return
+  }
+
+  const reordered = [...chapters.value]
+  const [movedItem] = reordered.splice(dragIndex, 1)
+  reordered.splice(dropIndex, 0, movedItem)
+  chapters.value = reordered
+  draggedIndex.value = null
+
+  await saveChapterOrder(reordered)
+}
+
+const saveChapterOrder = async (orderedChapters) => {
+  try {
+    const updates = orderedChapters.map((chapter, index) =>
+      updateChapter(chapter.id, { sortOrder: index })
+    )
+    await Promise.all(updates)
+    ElMessage.success('章节顺序已更新')
+  } catch (error) {
+    console.error('保存章节顺序失败:', error)
+    ElMessage.error('保存排序失败')
+    await reloadChapters()
+  }
 }
 
 const batchEdit = () => {
@@ -707,6 +798,52 @@ onMounted(() => {
 .chapter-item.selected {
   border-color: #409eff;
   background-color: #f0f9ff;
+}
+
+.sort-tip {
+  margin-bottom: 15px;
+}
+
+.drag-handle {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  color: #909399;
+  cursor: grab;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.drag-handle:hover {
+  color: #409eff;
+  background: #ecf5ff;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.chapter-item.sortable {
+  cursor: default;
+}
+
+.chapter-item.sortable:hover {
+  border-color: #c6e2ff;
+}
+
+.chapter-item.dragging {
+  opacity: 0.4;
+  border-style: dashed;
+}
+
+.chapter-item.drag-over {
+  border-color: #409eff;
+  background-color: #ecf5ff;
+  transform: translateY(2px);
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.2);
 }
 
 .chapter-checkbox {
