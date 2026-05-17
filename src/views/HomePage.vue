@@ -225,7 +225,7 @@
 
     <!-- 写作目标管理对话框 -->
     <el-dialog v-model="showGoalsDialog" title="写作目标管理" width="800px">
-      <WritingGoals @close="showGoalsDialog = false" />
+      <WritingGoals @goal-changed="loadStats" @close="showGoalsDialog = false" />
     </el-dialog>
   </div>
 </template>

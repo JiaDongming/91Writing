@@ -307,6 +307,8 @@ import {
   VideoPause, Delete, Rank
 } from '@element-plus/icons-vue'
 
+const emit = defineEmits(['goal-changed'])
+
 const PERIOD_TO_TYPE = { DAILY: 'daily', WEEKLY: 'weekly', MONTHLY: 'monthly' }
 const TYPE_TO_PERIOD = { daily: 'DAILY', weekly: 'WEEKLY', monthly: 'MONTHLY' }
 const STATUS_MAP = { ACTIVE: 'active', COMPLETED: 'completed', FAILED: 'failed', PAUSED: 'paused' }
@@ -482,6 +484,7 @@ const pauseGoal = async (goal) => {
     await updateGoal(goal.id, mapGoalToBackend({ ...goal, status: 'paused' }))
     goal.status = 'paused'
     ElMessage.success('目标已暂停')
+    emit('goal-changed')
   } catch {
     // 用户取消
   }
@@ -496,6 +499,7 @@ const deleteGoal = async (goalId) => {
     await apiDeleteGoal(goalId)
     goals.value = goals.value.filter(goal => goal.id !== goalId)
     ElMessage.success('目标删除成功')
+    emit('goal-changed')
   } catch {
     // 用户取消
   }
@@ -549,6 +553,7 @@ const saveGoal = async () => {
     showAddGoalDialog.value = false
     editingGoal.value = null
     resetGoalForm()
+    emit('goal-changed')
   } catch (error) {
     console.error('保存目标失败:', error)
   }
@@ -570,6 +575,7 @@ const saveProgress = async () => {
 
     try {
       await updateGoal(goal.id, mapGoalToBackend(goal))
+      emit('goal-changed')
     } catch {
       ElMessage.error('进度保存失败')
     }
